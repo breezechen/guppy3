@@ -10,11 +10,10 @@ def co_code_findloadednames(co):
     len_co_names = len(co.co_names)
     indexset = {}
     for insn in insns:
-        if insn.opcode >= HAVE_ARGUMENT:
-            if insn.opcode in hasloadname:
-                indexset[insn.argval] = 1
-                if len(indexset) >= len_co_names:
-                    break
+        if insn.opcode >= HAVE_ARGUMENT and insn.opcode in hasloadname:
+            indexset[insn.argval] = 1
+            if len(indexset) >= len_co_names:
+                break
     for name in co.co_varnames:
         try:
             del indexset[name]
@@ -26,7 +25,7 @@ def co_code_findloadednames(co):
 def co_findloadednames(co):
     """Find all loaded names in a code object and all its consts of code type"""
     names = {}
-    names.update(co_code_findloadednames(co))
+    names |= co_code_findloadednames(co)
     for c in co.co_consts:
         if isinstance(c, type(co)):
             names.update(co_findloadednames(c))

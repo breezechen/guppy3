@@ -25,7 +25,7 @@ class TestCase(support.TestCase):
 
     def chkrelattr(self, src, *attrs):
         for attr in attrs:
-            self.chkrel(src, getattr(src, attr), '%s.'+attr)
+            self.chkrel(src, getattr(src, attr), f'%s.{attr}')
 
     def chkpath(self, src, dst, expect=None):
         rel = self.shpaths(dst, src)
@@ -144,9 +144,14 @@ class RelationTestCase(TestCase):
                         'a')
 
     def test_instancemethod_relation(self):
+
+
+
         class T:
-            def f(x):
+            def f(self):
                 pass
+
+
         t = T()
         self.chkrelattr(t.f, '__func__', '__self__')
 
@@ -315,7 +320,7 @@ class RootTestCase(TestCase):
         self.aseq(rel, '%s.i0_builtins')
 
         for name in "codec_search_path", "codec_search_cache", "codec_error_registry":
-            attr = "i0_%s" % name
+            attr = f"i0_{name}"
             rel = str(self.relation(root, getattr(root, attr)))
             self.aseq(rel, '%%s.%s' % attr)
 
@@ -445,17 +450,14 @@ class PathTestCase(TestCase):
         #       width ** length, if width >= 1 and length >= 1
 
         dst = []
-        ls = []
-        for i in range(width):
-            ls.append([dst])
+        ls = [[dst] for _ in range(width)]
         ls = [dst] * width
-        for i in range(length-1):
+        for _ in range(length-1):
             xs = []
-            for j in range(width):
+            for _ in range(width):
                 ys = []
                 xs.append(ys)
-                for k in range(width):
-                    ys.append(ls[k])
+                ys.extend(ls[k] for k in range(width))
             ls = xs
         src = ls
         return src, dst
@@ -711,9 +713,6 @@ class NewTestCase(TestCase):
 
         print(iso(x, y).get_shpaths(iso(z)), file=o)
 
-        # Test that we can relate objects that inherits from a class and object
-        # (Used to segfault)
-
         class C:
             pass
 
@@ -733,6 +732,7 @@ class NewTestCase(TestCase):
         # XXX come up with an official way to do this.
         summary_str = self.heapy.UniSet.summary_str
         def str_address(x): return '<address>'
+
         str_address._idpart_header = getattr(
             summary_str.str_address, '_idpart_header', None)
         str_address._idpart_sortrender = getattr(
@@ -748,7 +748,7 @@ class NewTestCase(TestCase):
         self.aseq(S, iso(y))
 
         shp = iso(x).get_shpaths(iso(ob, y, z))
-        print(str(shp), file=o)
+        print(shp, file=o)
         print(repr(shp), file=o)
         S = iso()
         for i, p in enumerate(shp):
@@ -835,7 +835,7 @@ class NewTestCase(TestCase):
         # Test empty paths
         iso = self.iso
         dst = []
-        self.assertTrue(len(list(iso(dst).get_shpaths(iso()))) == 0)
+        self.assertTrue(not list(iso(dst).get_shpaths(iso())))
 
     def test_3(self):
         # Test that Edges is not included in the shortest path
@@ -919,7 +919,7 @@ class NewTestCase(TestCase):
         src = [dst] * 11
 
         shp = iso(dst).get_shpaths(iso(src))
-        print(str(shp), file=o)
+        print(shp, file=o)
         self.aseq(o.getvalue(), """\
  0: Src[0]
  1: Src[1]

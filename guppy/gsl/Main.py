@@ -21,7 +21,7 @@ class SpecEnv:
             if src is not None:
                 filename = src.filename
                 linetext = src.get_line(index=context.index)
-            print('%s:%s:' % (filename, lineno))
+            print(f'{filename}:{lineno}:')
             if linetext:
                 print('    %r' % linetext)
 
@@ -35,14 +35,14 @@ class SpecEnv:
 
         self.errmsg_context(context)
         if harmless:
-            print('*   %s' % message)
+            print(f'*   {message}')
         else:
-            print('*** %s' % message)
+            print(f'*** {message}')
         print()
 
         for msg, ctx in more:
             self.errmsg_context(ctx)
-            print('    %s' % msg)
+            print(f'    {msg}')
             print()
 
         if self.debug:
@@ -100,7 +100,7 @@ class SpecEnv:
             if len(ds) > 1:
                 print('Duplicate definition of name %r, defined in:' % name)
                 for (d, node) in ds:
-                    print('    %s line %s' % (d.get_doc_name(), node.index+1))
+                    print(f'    {d.get_doc_name()} line {node.index + 1}')
                 print('Will use the first one.')
 
         nodefs = []
@@ -111,10 +111,9 @@ class SpecEnv:
                 for (d, node) in ds:
                     used[d.get_doc_name()] = 1
                     node.tag = 'link_to_unresolved'
-                used = list(used.keys())
-                used.sort()
+                used = sorted(used.keys())
                 used = ', '.join(used)
-                nodefs.append('%s used in %s' % (name, used))
+                nodefs.append(f'{name} used in {used}')
             else:
                 defd, defnode = defines[name][0]
                 for (d, node) in ds:
@@ -138,19 +137,13 @@ class SpecEnv:
     def package_of_filename(self, filename, packname=None, nostrip=1, input_string=None):
         mod = self.mod
         if packname is None:
-            if filename.endswith('.gsl'):
-                packname = filename[:-4]
-            else:
-                packname = filename
+            packname = filename[:-4] if filename.endswith('.gsl') else filename
             packname = packname.replace(mod.IO.path.sep, '.')
         if self.input_dir:
             filename = mod.IO.path.join(self.input_dir, filename)
         else:
             filename = mod.IO.path.abspath(filename)
-        if input_string is not None:
-            data = input_string
-        else:
-            data = mod.IO.read_file(filename)
+        data = input_string if input_string is not None else mod.IO.read_file(filename)
         md5 = mod.md5()
         md5.update(b'.filename: %s\n' % filename.encode('utf-8'))
         md5.update(b'.packname: : %s\n' % packname.encode('utf-8'))
@@ -259,11 +252,8 @@ class Description:
     def aspects_extend(self, as_):
         for asp in as_:
             try:
-                k = asp.src.definame
-                # k = asp.tgt.definame # Humm
-                if k:
-                    w = self.localview.get(k)
-                    if w:
+                if k := asp.src.definame:
+                    if w := self.localview.get(k):
                         if w is asp:
                             # May happen eg as in test16, for a product
                             # But it is somewhat mystical.
@@ -274,10 +264,9 @@ class Description:
                     self.localview[k] = asp
                 bn = self.aspects_by_tag.setdefault(asp.d_tag, [])
                 oc = asp.d_max_occur
-                if oc is not None:
-                    if len(bn) + 1 > oc:
-                        self.error('More than %d %r aspects.' % (
-                            oc, asp.d_tag), asp.src.node)
+                if oc is not None and len(bn) + 1 > oc:
+                    self.error('More than %d %r aspects.' % (
+                        oc, asp.d_tag), asp.src.node)
                 bn.append(asp)
                 self.aspects.append(asp)
             except ReportedError:
@@ -349,14 +338,20 @@ class Description:
         return al
 
     def find_kind_aspects(self):
-        kas = []
-        for asp in self.find_aspects('*'):
-            if asp.d_tag in ('attribute', 'mapping', 'kind', 'either', 'kind_of', 'superkind',
-                             'superkind_of'):
-                kas.append(asp)
-            else:
-                pass
-        return kas
+        return [
+            asp
+            for asp in self.find_aspects('*')
+            if asp.d_tag
+            in (
+                'attribute',
+                'mapping',
+                'kind',
+                'either',
+                'kind_of',
+                'superkind',
+                'superkind_of',
+            )
+        ]
 
     def merge_policy(self, descrs):
         return descrs
@@ -377,8 +372,7 @@ class Description:
                 aks.append(beam(self, asp))
             elif asp.d_tag in ('kind', 'kind_of', 'subkind_of') and asp is not self:
                 a = beam(self, asp)
-                for b in asp.get_atom_beams():
-                    aks.append(a + b)
+                aks.extend(a + b for b in asp.get_atom_beams())
         return aks
 
     def get_aspects_kind(self, aspects=None):
@@ -406,15 +400,14 @@ class Description:
         return examples
 
     def get_re(self, opt):
-        if opt.get('get_examples'):
-            exres = [self.mod.RE.Single(x) for x in self.get_examples()]
-            if not exres:
-                self.error('Test coverage error: no examples specified.',
-                           self.tgt.node,
-                           CoverageError)
-            return self.mod.RE.Union(*exres)
-        else:
+        if not opt.get('get_examples'):
             return self.mod.RE.Single(self)
+        exres = [self.mod.RE.Single(x) for x in self.get_examples()]
+        if not exres:
+            self.error('Test coverage error: no examples specified.',
+                       self.tgt.node,
+                       CoverageError)
+        return self.mod.RE.Union(*exres)
 
     def get_most_specific_descrs(self, descrs):
         nds = []
@@ -443,18 +436,17 @@ class Description:
                 # length = 1, has been checked
                 assert len(sa) == 1
                 return sa[0].src.node.arg.strip()
-            if e.d_tag != 'package':
-                return find(e.env)
-            return None
+            return find(e.env) if e.d_tag != 'package' else None
+
         return find(self)
 
     def gen_description_doc(self, out):
-        ds = self.find_aspects('description')
-        if not ds:
-            out.gen_text('<NO DESCRIPTION OF %r>' % self.tgtfullname)
-        else:
+        if ds := self.find_aspects('description'):
             for d in ds:
                 d.gen_doc(out)
+
+        else:
+            out.gen_text('<NO DESCRIPTION OF %r>' % self.tgtfullname)
 
     def get_id_name(self):
         return self.tgtfullname
@@ -474,11 +466,7 @@ class Description:
     def get_Name(self):
         # To be used in Name of doc.
         n = self.find_aspects('name')
-        if not n:
-            name = self.tgtlastname
-        else:
-            name = n.tgt.node.arg.strip()
-        return name
+        return n.tgt.node.arg.strip() if n else self.tgtlastname
 
     def get_descr_by_subject(self, subject):
         return self.pac.get_descr_by_subject(subject)
@@ -527,7 +515,7 @@ class Description:
         k = Kind()
         k.d_tag = 'kind'
         k.aspects = kinds
-        k.tgtfullname = '(%s)' % ('&'.join([x.tgtfullname for x in kinds]))
+        k.tgtfullname = f"({'&'.join([x.tgtfullname for x in kinds])})"
         k.is_lookuped = 1
         return k
 
@@ -538,7 +526,7 @@ class Description:
         k = Kind()
         k.d_tag = 'kind'
         k.aspects = kinds
-        k.tgtfullname = '(%s)' % ('&'.join([x.tgtfullname for x in kinds]))
+        k.tgtfullname = f"({'&'.join([x.tgtfullname for x in kinds])})"
         k.is_lookuped = True
         k.is_synthetic = True
         return k
@@ -546,14 +534,13 @@ class Description:
     def make_or_kind(self, kinds):
         if len(kinds) == 1:
             return kinds[0]
-        else:
-            k = Superkind()
-            k.d_tag = 'kind'
-            k.aspects = kinds
-            k.tgtfullname = '(%s)' % ('|'.join([x.tgtfullname for x in kinds]))
-            k.is_lookuped = True
-            k.is_synthetic = True
-            return k
+        k = Superkind()
+        k.d_tag = 'kind'
+        k.aspects = kinds
+        k.tgtfullname = f"({'|'.join([x.tgtfullname for x in kinds])})"
+        k.is_lookuped = True
+        k.is_synthetic = True
+        return k
 
 
 class Definition(Description):
@@ -564,11 +551,10 @@ class Definition(Description):
         src.__class__ = self.__class__
         if src.d_tag == 'import':
             src.d_tag = self.d_tag
-        else:
-            if src.d_tag != self.d_tag:
-                # Can't think of how this would happen -
-                # so not yet converted to .error()
-                raise ImportError('Different description tag')
+        elif src.d_tag != self.d_tag:
+            # Can't think of how this would happen -
+            # so not yet converted to .error()
+            raise ImportError('Different description tag')
         src.aspects_extend(self.aspects)
 
 
@@ -695,10 +681,7 @@ class Product(Description):
             d.export_aspects(src)
 
     def is_more_specific_than(self, d):
-        for x in self.ds:
-            if x is d or x.is_more_specific_than(d):
-                return True
-        return False
+        return any(x is d or x.is_more_specific_than(d) for x in self.ds)
 
 
 class PackageDescription(UntypedDescription):
@@ -755,7 +738,7 @@ class Package(Description):
 
     def get_descr_by_subject(self, subject):
         name = subject.fullname
-        if name.startswith(self.srcfullname+'.'):
+        if name.startswith(f'{self.srcfullname}.'):
             name = name[len(self.srcfullname)+1:].strip()
         else:
             self.error('Undefined: %r' % name, subject.node)
@@ -776,11 +759,11 @@ class Package(Description):
         descrs = self.get_most_specific_descrs(descrs)
         if len(descrs) > 1:
             descrs = self.merge_policy(descrs)
-            if len(descrs) > 1:
-                self.error('Conflicting descriptions of %r:%r' % (
-                    name, [d.src.fullname for d in descrs]),
-                    context,
-                    DuplicateError)
+        if len(descrs) > 1:
+            self.error('Conflicting descriptions of %r:%r' % (
+                name, [d.src.fullname for d in descrs]),
+                context,
+                DuplicateError)
 
         return descrs[0]
 
@@ -843,10 +826,10 @@ class Attribute(Definition):
         return k.tgtfullname
 
     def get_link_name(self):
-        # xxx needs smoother logic
-        s = '%s.%s' % (self.get_descr_by_subject(
-            self.tgt.parent).get_link_name(), self.tgt.lastname)
-        return s
+        return '%s.%s' % (
+            self.get_descr_by_subject(self.tgt.parent).get_link_name(),
+            self.tgt.lastname,
+        )
 
     def get_test_kind(self):
         kas = self.find_kind_aspects()
@@ -926,10 +909,7 @@ class Example(Description):
 
     def get_ctx_text(self):
         asp = self.find_aspects('in_context')
-        if not asp:
-            return ''
-        # It is of length 1, has been checked.
-        return asp[0].tgt.node.arg.strip()
+        return asp[0].tgt.node.arg.strip() if asp else ''
 
     def get_use_text(self, x):
         return x
@@ -1016,7 +996,7 @@ class Mapping(Description):
             try:
                 xs = re.sequni()
             except self.mod.RE.InfiniteError:
-                print('Infinitely long args example for %s' % self.srcfullname)
+                print(f'Infinitely long args example for {self.srcfullname}')
                 print(
                     'Limiting by expanding each Cleene closure 0 up to %d times.' % coverage)
                 re = re.limited(coverage)
@@ -1081,15 +1061,12 @@ class ArgsExample:
         return ', '.join(self.negs)
 
     def get_arg_value(self, name):
-        i = 0
-        for a in self.mapping.find_arg_aspects():
+        for i, a in enumerate(self.mapping.find_arg_aspects()):
             t = a.d_tag
-            if t == 'arg':
-                if a.get_name() == name:
-                    return self.egs[i]
-            else:
+            if t != 'arg':
                 raise ConditionError('No argument matches: %r' % name)
-            i += 1
+            if a.get_name() == name:
+                return self.egs[i]
 
     def get_preconditions(self):
         return self.mapping.find_aspects('precondition')
@@ -1105,8 +1082,7 @@ class ArgsExample:
 
         map = self.mapping
 
-        pres = map.find_aspects('precondition')
-        if pres:
+        if pres := map.find_aspects('precondition'):
             for a in kind.find_aspects('attribute'):
                 for m in a.find_aspects('mapping'):
                     mpre = m.find_aspects('precondition')
@@ -1117,13 +1093,9 @@ class ArgsExample:
                         # found one
                         args = m.get_args_for_args(self, match)
                         return [SetUp(a.get_attr_name(), args)]
-                        break
-                else:
-                    continue
-                break
-            else:
-                # Caller will do error reporting
-                return None
+                continue
+            # Caller will do error reporting
+            return None
         return []
 
     def match_to_kind(self, kind):
@@ -1142,7 +1114,7 @@ class ArgsExample:
                             break
                         upd[a] = b
                     else:
-                        match.update(upd)
+                        match |= upd
                         break
             else:
                 return None
@@ -1221,15 +1193,14 @@ class Condition(Description):
     d_sub = ('self', 'arg', 'comment', 'description', 'python_code')
 
     def get_arg_names(self):
-        an = []
-        for a in self.find_aspects('*'):
-            if a.d_tag in ('self', 'arg'):
-                an.append(a.src.node.arg.strip())
-        return an
+        return [
+            a.src.node.arg.strip()
+            for a in self.find_aspects('*')
+            if a.d_tag in ('self', 'arg')
+        ]
 
     def get_def_name(self):
-        dn = self.src.lastname
-        return dn
+        return self.src.lastname
 
     def_name = property(get_def_name)
 
@@ -1250,7 +1221,7 @@ class ConditionRef(Description):
     def get_cond_id(self):
         cond_id = self.cond_definition.tgtfullname
         if self.is_not:
-            cond_id = 'not ' + cond_id
+            cond_id = f'not {cond_id}'
         self.cond_id = cond_id
         return cond_id
 
@@ -1262,7 +1233,7 @@ class ConditionRef(Description):
     def resolve_special(self):
         cond_def = self.src.cond_definition
         self.cond_definition = self.env.get_descr_by_subject(cond_def)
-        self.cond_doc_name = cond_def.parent.lastname + '.' + cond_def.lastname
+        self.cond_doc_name = f'{cond_def.parent.lastname}.{cond_def.lastname}'
         self.cond_expr = self.src.node.arg.strip()    # Mostly for information
         self.arg_names = self.src.arg_names
         self.is_not = self.src.is_not
@@ -1348,7 +1319,7 @@ class KeyArgEG:
         return self.eg.get_ctx_text()
 
     def get_use_text(self, x):
-        return '%s=%s' % (self.name, x)
+        return f'{self.name}={x}'
 
 
 class KeyArg(Arg):
@@ -1377,9 +1348,12 @@ class Optionals(Description):
 
     def get_re(self, opt):
         def opt_ra(aspects):
-            if not aspects:
-                return self.mod.RE.Epsilon
-            return (aspects[0].get_re(opt) + opt_ra(aspects[1:]))('?')
+            return (
+                (aspects[0].get_re(opt) + opt_ra(aspects[1:]))('?')
+                if aspects
+                else self.mod.RE.Epsilon
+            )
+
         return opt_ra(self.find_arg_aspects())
 
 
@@ -1430,7 +1404,7 @@ class Repeat(Description):
 
         if hi == '*':
             res = re('*')
-            for i in range(lo):
+            for _ in range(lo):
                 res = re + res
         else:
             if hi < lo:
@@ -1438,10 +1412,10 @@ class Repeat(Description):
                            self.src.node)
 
             a = self.mod.RE.Epsilon
-            for i in range(lo):
+            for _ in range(lo):
                 a += re
             b = self.mod.RE.Epsilon
-            for i in range(lo, hi):
+            for _ in range(lo, hi):
                 b = (re + b)('?')
             res = a + b
 
@@ -1661,7 +1635,7 @@ beam_table = {
 
 
 def beam(*objects):
-    k_tag = tuple([x.d_tag for x in objects])
+    k_tag = tuple(x.d_tag for x in objects)
     C = beam_table[k_tag]
     return C(k_tag, *objects)
 
@@ -1669,7 +1643,7 @@ def beam(*objects):
 class ProductSubject:
     def __init__(self, subjects):
         self.subjects = subjects
-        self.fullname = '(%s)' % '*'.join([x.fullname for x in subjects])
+        self.fullname = f"({'*'.join([x.fullname for x in subjects])})"
 
 
 class Subject:
@@ -1704,7 +1678,7 @@ class Subject:
         shtag = self.mod.SpecNodes.reverse_node_aliases[node.tag]
         names = self.get_arglist(node, min=1)
         for name in names:
-            name = '%s:%s' % (shtag, name)
+            name = f'{shtag}:{name}'
             self.add_new_subject(node, name)
 
     def _visit_type_other(self, node):
@@ -1800,10 +1774,9 @@ class Subject:
     def _visit_aspect(self, node, mode):
         if self.aspect_mode is None:
             self.aspect_mode = mode
-        else:
-            if self.aspect_mode != mode:
-                self.error('Inconsistent aspect mode: %r, was: %r' % (mode, self.aspect_mode),
-                           node)
+        elif self.aspect_mode != mode:
+            self.error('Inconsistent aspect mode: %r, was: %r' % (mode, self.aspect_mode),
+                       node)
         self._visit_children(node)
 
     def _visit_children(self, node):
@@ -1820,7 +1793,7 @@ class Subject:
             self.node_index += 1
 
     def make_child_name(self, child_lastname):
-        return '%s.%s' % (self.fullname, child_lastname)
+        return f'{self.fullname}.{child_lastname}'
 
     def new_subject(self, node, name=None):
         is_def = self.mod.get_description_class(node.tag).d_is_def
@@ -1891,7 +1864,7 @@ class Subject:
     def visit_condition(self, node):
         names = self.get_arglist(node, min=1)
         for name in names:
-            self.add_new_subject(node, 'cond:%s' % name)
+            self.add_new_subject(node, f'cond:{name}')
 
     def visit_default(self, node):
         description_class = self.mod.get_description_class(node.tag)
@@ -1904,7 +1877,7 @@ class Subject:
                 msg = 'Tag %r is a definition, requires ::' % node.tag
             self.error(msg, node, exception=None)
 
-        getattr(self, '_visit_type_%s' % description_class.d_type)(node)
+        getattr(self, f'_visit_type_{description_class.d_type}')(node)
 
     def visit_description(self, node):
         self.def_new_subject(node)
@@ -1918,11 +1891,10 @@ class Subject:
         ex = node.arg.strip()
 
         if '\n' in ex:
-            if not (partab.get(ex[:1]) == ex[-1:] or
-                    partab.get(ex[:3]) == ex[-3:]):
+            if partab.get(ex[:1]) != ex[-1:] and partab.get(ex[:3]) != ex[-3:]:
                 self.error('Multi-line expression should be in parentheses (for clarity).', node,
                            exception=None, harmless=1)
-            ex = '(%s)' % ex
+            ex = f'({ex})'
 
         subject.ex_text = ex
 
@@ -1935,15 +1907,14 @@ class Subject:
         for ch in node.children:
             t = ch.tag
             if t == 'from':
-                for name in self.get_arglist_only(ch):
-                    froms.append((name, ch))
+                froms.extend((name, ch) for name in self.get_arglist_only(ch))
             elif t == 'resolve_by':
                 if resolve_mode:
                     self.error("More than 1 'resolve' clause.",
                                ch.node, exception=None)
                 else:
                     resolve_mode = ch.arg.strip()
-                    if not resolve_mode in ('and', 'or'):
+                    if resolve_mode not in ('and', 'or'):
                         self.error("Resolve by: and / or expected.",
                                    ch,
                                    exception=None)
@@ -1959,10 +1930,7 @@ class Subject:
         using_map = {}
         if usings is not None:
             if len(usings) != len(my_names):
-                if len(using_names) < len(my_names):
-                    manyfew = 'few'
-                else:
-                    manyfew = 'many'
+                manyfew = 'few' if len(using_names) < len(my_names) else 'many'
                 self.error(
                     "Too %s 'using' names, should match number of names in .import" % manyfew,
                     using_node,
@@ -1971,14 +1939,13 @@ class Subject:
                 # zip stops at the shortest list, ok
                 using_map[m] = u
 
-        if len(froms) == 0:
+        if not froms:
             self.error("No 'from' clause", node)
 
-        if len(froms) > 1:
-            if not resolve_mode:
-                self.error("Importing from multiple packages but no 'resolve by' clause",
-                           node, exception=None)
-                resolve_mode = 'and'
+        if len(froms) > 1 and not resolve_mode:
+            self.error("Importing from multiple packages but no 'resolve by' clause",
+                       node, exception=None)
+            resolve_mode = 'and'
 
         for name in my_names:
             subject = self.def_new_subject(node, name)
@@ -2011,7 +1978,7 @@ class Subject:
 
     def visit_postcondition(self, node):
         arg = node.arg.strip()
-        if not '(' in arg:
+        if '(' not in arg:
             self.error('No left parenthesis', node)
         lpar = arg.index('(')
         rpar = arg.find(')')
@@ -2019,10 +1986,7 @@ class Subject:
             self.error('None or misplaced right parenthesis', node)
 
         n = arg[lpar+1:rpar].strip()
-        if ',' in n:
-            n = [x.strip() for x in n.split(',')]
-        else:
-            n = [n]
+        n = [x.strip() for x in n.split(',')] if ',' in n else [n]
         arg_names = n
 
         cond_name = arg[:lpar].strip()
@@ -2035,7 +1999,7 @@ class Subject:
 
         parts = cond_name.split('.')
         if not parts[-1].startswith('cond:'):
-            parts[-1] = 'cond:'+parts[-1]
+            parts[-1] = f'cond:{parts[-1]}'
             cond_name = '.'.join(parts)
 
         cond_def = self.find_subject(cond_name, node)
@@ -2060,7 +2024,7 @@ class PackageSubject(Subject):
         self.pac = self
         self.filename = filename
         #name = 'package_%s'%(name,)
-        name = '%s' % (name,)
+        name = f'{name}'
         Subject.__init__(self, self, node, name)
         self.lastname = name.split('.')[-1]
         self.tag = 'package'
@@ -2112,7 +2076,7 @@ class PackageSubject(Subject):
                     self.error('No such subject: %r  in %r.' %
                                (n, sname), node)
                 return SubImportSubject(s, node, parts[i:])
-            sname = sname + '.' + n
+            sname = f'{sname}.{n}'
             s = ns
         return s
 

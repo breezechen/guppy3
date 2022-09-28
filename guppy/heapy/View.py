@@ -15,8 +15,7 @@ class Horizon:
         self.hv_horizon = mod.heapyc.Horizon(self.hv)
 
     def news(self):
-        r = self.retset(self.hv_horizon.news(self.mod.enter(self.hv.heap)))
-        return r
+        return self.retset(self.hv_horizon.news(self.mod.enter(self.hv.heap)))
 
 
 class ClearCallback(object):
@@ -35,8 +34,8 @@ class ClearCallback(object):
 class Gchook_type(object):
     __slots__ = 'x', '__weakref__', 'cb'
 
-    def __init__(g):
-        g.x = g
+    def __init__(self):
+        self.x = self
 
 
 class ObservationList(list):
@@ -131,8 +130,7 @@ class _GLUECLAMP_:
         def clear_drg():
             if drg.is_sorted and self._is_clear_drg_enabled:
                 drg.clear()
-            else:
-                pass
+
         self.clear_register_method(clear_drg)
         return drg
 
@@ -164,9 +162,10 @@ class _GLUECLAMP_:
     def _get_heapyc(self): return self._parent.heapyc
 
     def _get_hv(self):
-        hv = self.new_hv(_hiding_tag_=self._hiding_tag_,
-                         is_hiding_calling_interpreter=self.is_hiding_calling_interpreter)
-        return hv
+        return self.new_hv(
+            _hiding_tag_=self._hiding_tag_,
+            is_hiding_calling_interpreter=self.is_hiding_calling_interpreter,
+        )
 
     def _get_norefer(self): return self.mutnodeset()
 
@@ -184,8 +183,6 @@ class _GLUECLAMP_:
         if rg.is_sorted:
             rg.clear()
             self.norefer.clear()
-        else:
-            pass
 
     def _get_referrers_lock(self): return 0
 
@@ -227,7 +224,7 @@ Return a tuple of dominos for the tuple of sets of objects X."""
         S = self.immnodeset([self.root])
         D = self.immnodeset_union(D_)
         W = T(S, D)
-        return tuple([self.retset(T(Di, W) - T(D, W | Di)) for Di in D_])
+        return tuple(self.retset(T(Di, W) - T(D, W | Di)) for Di in D_)
 
     def domisize(self, X):
         """domisize(X) -> int
@@ -240,8 +237,7 @@ indirectly, when the objects in X are deallocated. See also: indisize."""
     def domisize_tuple(self, X):
         """"V.domisize_tuple(X) -> tuple of ints
 Return a tuple of dominated sizes for the tuple of sets of objects X."""
-        return tuple([self.indisize(dominos_i)
-                      for dominos_i in self.dominos_tuple(X)])
+        return tuple(self.indisize(dominos_i) for dominos_i in self.dominos_tuple(X))
 
     def enter(self, func):
         if self.hv.is_hiding_calling_interpreter:
@@ -422,7 +418,7 @@ visible subobjects. See also: domisize."""
         try:
             return self.immnodeset(self.hv.heap()).obj_at(addr)
         except ValueError:
-            raise ValueError('No object found at address %s' % hex(addr))
+            raise ValueError(f'No object found at address {hex(addr)}')
 
     def observation_containers(self):
         # Return the current set of 'observation containers'

@@ -45,10 +45,7 @@ class Rect(object):
             self.width = len(self.lines[0])
 
     def get_lines(self, pickednos=0):
-        lines = []
-        for i in self.lnos & ~ pickednos:
-            lines.append(self.all_lines[i])
-        return lines
+        return [self.all_lines[i] for i in self.lnos & ~ pickednos]
 
     def __repr__(self):
         return '<\n dir = %d\n width = %d\n lnos = %s\n lines = %s\n>' % (
@@ -63,10 +60,7 @@ class LeftRect(Rect):
         return self.lines[0][:self.width]
 
     def get_uncommons(self, pickednos=0):
-        uc = []
-        for line in self.get_lines(pickednos):
-            uc.append(line[self.width:])
-        return uc
+        return [line[self.width:] for line in self.get_lines(pickednos)]
 
 
 class RightRect(Rect, object):
@@ -75,18 +69,13 @@ class RightRect(Rect, object):
 
     def get_common_part(self):
         lo = -self.width
-        if lo == 0:
-            return []
-        return self.lines[0][lo:]
+        return [] if lo == 0 else self.lines[0][lo:]
 
     def get_uncommons(self, pickednos=0):
-        uc = []
         hi = -self.width
         if hi == 0:
             hi = None
-        for line in self.get_lines(pickednos):
-            uc.append(line[:hi])
-        return uc
+        return [line[:hi] for line in self.get_lines(pickednos)]
 
 
 def sum_gauge(gauge, lst):
@@ -94,9 +83,7 @@ def sum_gauge(gauge, lst):
     if gauge is None:
         return len(lst)
     else:
-        gain = 0
-        for x in lst:
-            gain += gauge(x)
+        gain = sum(gauge(x) for x in lst)
     return gain
 
 
@@ -104,8 +91,7 @@ def cmp_gauged(xs, ys, gauges):
     for gauge in gauges:
         gx = sum_gauge(gauge, xs)
         gy = sum_gauge(gauge, ys)
-        c = cmp(gx, gy)
-        if c:
+        if c := cmp(gx, gy):
             return c
     return 0
 
@@ -178,10 +164,7 @@ def choose(rects, lines=[], gauges=[None]):
             if len(pss) == len(uncommons):
                 pslnos = immbitset(pss)
                 pss = [lines[lno] for lno in pss]
-                if s.dir == -1:
-                    c = InducedRightRect
-                else:
-                    c = InducedLeftRect
+                c = InducedRightRect if s.dir == -1 else InducedLeftRect
                 ir = c(s, pss, pslnos)
                 irs.append(ir)
 
@@ -323,8 +306,7 @@ def choose(rects, lines=[], gauges=[None]):
 
 def chooserects(lines, gauges=[None]):
     rects = brect(lines)
-    choosen = choose(rects, lines, gauges)
-    return choosen
+    return choose(rects, lines, gauges)
 
 
 def pr():
@@ -398,7 +380,7 @@ def pr():
 
 
 def tmany():
-    for i in range(100):
+    for _ in range(100):
         x = chooserects(['abc',
                          'abe',
                          'ace',

@@ -5,10 +5,7 @@ from tkinter import *
 
 
 def tkcursors(master=None):
-    if master is None:
-        root = Tk()
-    else:
-        root = master
+    root = Tk() if master is None else master
     for i, cursor in enumerate((
         'X_cursor',
         'arrow',

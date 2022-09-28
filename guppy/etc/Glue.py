@@ -29,10 +29,7 @@ def ispackage(m):
 
 
 def dotname(first, last):
-    if first and last:
-        return '%s.%s' % (first, last)
-    else:
-        return first + last
+    return f'{first}.{last}' if first and last else first + last
 
 
 class Interface(object):
@@ -44,7 +41,11 @@ class Interface(object):
             getattr(self, name)
 
     def _import(self, *names):
-        return ','.join(names) + '=' + ','.join(['self._root.%s' % name for name in names])
+        return (
+            ','.join(names)
+            + '='
+            + ','.join([f'self._root.{name}' for name in names])
+        )
 
     def __getattr__(self, name):
         return self._share.getattr(self, name)
@@ -82,7 +83,7 @@ class Owner:
         if out is None:
             out = sys.stdout
         if not short:
-            print('Attributes used by %s:' % self.name, file=out)
+            print(f'Attributes used by {self.name}:', file=out)
             print(self.name[:self.name.rindex('.')+1], file=out)
         complete = []
         for a in self.galog:
@@ -127,24 +128,24 @@ class Share:
                 if attr.startswith('_set_'):
                     attr = attr[len('_set_'):]
                     if attr not in self.setable and attr not in self.chgable:
-                        raise TypeError(self.message(
-                            '%s must be in either _setable_ or _chgable_ '
-                            'for _set_%s to work' % (attr, attr)))
+                        raise TypeError(
+                            self.message(
+                                f'{attr} must be in either _setable_ or _chgable_ for _set_{attr} to work'
+                            )
+                        )
+
 
         imports = getattr(Clamp, '_imports_', ())
         if not isinstance(imports, tuple):
             raise TypeError(self.message(
                 'the _imports_ attribute must be a tuple'))
-        self.importedfrom = {}
         pres = {}
         parent_inter = root_inter = None
+        self.importedfrom = {}
         for fi in imports:
             presuf = fi.split(':')
             if len(presuf) != 2:
-                if len(presuf) > 2:
-                    s = "Too many"
-                else:
-                    s = "No"
+                s = "Too many" if len(presuf) > 2 else "No"
                 raise SyntaxError("%s ':' in import directive %r." % (s, fi))
             pre, suf = presuf
             pre = pre.strip()
@@ -165,16 +166,13 @@ class Share:
                 else:
                     raise SyntaxError(
                         "Module must begin with _parent or _root")
-                if len(hdta) == 2:
-                    prepa = [hdo, hdta[1], None]
-                else:
-                    prepa = [hdo, '', hdo]
+                prepa = [hdo, hdta[1], None] if len(hdta) == 2 else [hdo, '', hdo]
                 pres[pre] = prepa
 
             sufs = suf.split(',')
             for su in sufs:
                 su = su.strip()
-                im = getattr(Clamp, '_get_%s' % su, None)
+                im = getattr(Clamp, f'_get_{su}', None)
                 if im is not None:
                     raise ValueError(
                         'Cant have both name (=%r) in boht importfrom  and _get' % su)
@@ -239,8 +237,7 @@ class Share:
                     if name == '__repr__':
                         return lambda: str(inter)
                     elif name == '__str__':
-                        return lambda: '<%s interface at %s>' % (inter._name,
-                                                                 hex(id(self)))
+                        return lambda: f'<{inter._name} interface at {hex(id(self))}>'
                     else:
                         x = self.getattr_module(inter, name)
                 wrapattr = self.wrapattr
@@ -300,7 +297,7 @@ class Share:
             return x
 
         try:
-            im = getattr(Clamp, '_get_%s' % name)
+            im = getattr(Clamp, f'_get_{name}')
         except AttributeError:
             pass
         else:
@@ -350,7 +347,7 @@ class Share:
 
     def makeName(self, name):
         if self.name:
-            name = '%s.%s' % (self.name, name)
+            name = f'{self.name}.{name}'
         return name
 
     def makeOwner(self, name):
@@ -362,10 +359,9 @@ class Share:
     def pp(self, out=sys.stdout):
         if not self.owners:
             return
-        print('Dependencies found for %s' % self.name, file=out)
+        print(f'Dependencies found for {self.name}', file=out)
         print('-----------------------'+'-'*len(self.name), file=out)
-        keys = list(self.owners.keys())
-        keys.sort()
+        keys = sorted(self.owners.keys())
         for key in keys:
             lastname = key[key.rindex('.')+1:]
             print(lastname, file=out)
@@ -375,9 +371,8 @@ class Share:
     def rpp(self, out=sys.stdout):
         self.pp(out)
         for k, d in list(self.data.items()):
-            if k not in ('_root', '_parent'):
-                if isinstance(d, Share):
-                    d.rpp()
+            if k not in ('_root', '_parent') and isinstance(d, Share):
+                d.rpp()
 
     def setattr(self, inter, name, value):
         Clamp = self.Clamp
@@ -387,15 +382,18 @@ class Share:
 
         setable = self.setable
         chgable = self.chgable
-        if (name not in setable and name not in chgable and
-                (not (name in self.data and self.data[name] is value))):
+        if (
+            name not in setable
+            and name not in chgable
+            and (name not in self.data or self.data[name] is not value)
+        ):
             raise ValueError("""Can not change attribute %r,
 because it is not in _setable_ or _chgable_.""" % name)
         if name in self.data and self.data[name] is not value and name not in chgable:
             raise ValueError("""Can not change attribute %r,
 because it is already set and not in _chgable_.""" % name)
 
-        im = getattr(Clamp, '_set_%s' % name, None)
+        im = getattr(Clamp, f'_set_{name}', None)
         if im is not None:
             im(inter, value)
 

@@ -10,10 +10,7 @@ class Doc:  # base class
         return self.getstr()
 
     def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return 0
-
-        return str(self) == str(other)
+        return str(self) == str(other) if isinstance(other, self.__class__) else 0
 
     def __hash__(self):
         return hash(str(self))
@@ -58,7 +55,7 @@ class Attribute(Doc):
         return self.mapchildren(lambda x: x % other)
 
     def getstr(self):
-        return '%s.%s' % (self.obj.getstr(), self.name)
+        return f'{self.obj.getstr()}.{self.name}'
 
     def mapchildren(self, f):
         return self.__class__(self.mod, f(self.obj), self.name)
@@ -71,7 +68,7 @@ class RootAttribute(Doc):
         self.name = name
 
     def getstr(self):
-        return '%s' % (self.name,)
+        return f'{self.name}'
 
     def mapchildren(self, f):
         return self
@@ -95,9 +92,7 @@ class BinaryOp(Doc):
         self.b = b
 
     def getstr(self):
-        return '%s %s %s' % (self.a.getstr(),
-                             self.table[self.op],
-                             self.b.getstr())
+        return f'{self.a.getstr()} {self.table[self.op]} {self.b.getstr()}'
 
     def mapchildren(self, f):
         return self.__class__(self.mod, self.op, f(self.a), f(self.b))
@@ -116,7 +111,7 @@ class UnaryOp(Doc):
         self.a = a
 
     def getstr(self):
-        return '%s %s' % (self.table[self.op], self.a.getstr())
+        return f'{self.table[self.op]} {self.a.getstr()}'
 
     def mapchildren(self, f):
         return self.__class__(self.mod, self.op, f(self.a))
@@ -130,10 +125,7 @@ class CallFunc(Doc):
         self.kwds = kwds
 
     def getstr(self):
-        return '%s(%s%s)' % (
-            self.obj.getstr(),
-            ', '.join([x.getstr() for x in self.args]),
-            ', '.join(['%s=%s' % (k, v.getstr()) for k, v in list(self.kwds.items())]))
+        return f"{self.obj.getstr()}({', '.join([x.getstr() for x in self.args])}{', '.join([f'{k}={v.getstr()}' for k, v in list(self.kwds.items())])})"
 
     def mapchildren(self, f):
         obj = f(self.obj)
@@ -189,9 +181,9 @@ class Tuple(Doc):
         return self.__class__(self.mod, *[f(x) for x in self.args])
 
     def getstr(self):
-        x = '(%s)' % ', '.join([x.getstr() for x in self.args])
+        x = f"({', '.join([x.getstr() for x in self.args])})"
         if len(self.args) == 1:
-            x = x[:-1]+',)'
+            x = f'{x[:-1]},)'
         return x
 
 
@@ -203,19 +195,13 @@ class _GLUECLAMP_:
 
     def add_origin(self, obj, origin):
         o = getattr(obj, '_origin_', None)
-        if o is None:
-            obj._origin_ = origin
-        else:
-            obj._origin_ = self.multi(o, origin)
+        obj._origin_ = origin if o is None else self.multi(o, origin)
         return obj
 
     def add_wrapdict(self, obj, doc):
         wd = self.wrapdict
         o = wd.get(id(obj))
-        if o is None:
-            o = (obj, doc)
-        else:
-            o = (obj, self.multi(o[1], doc))
+        o = (obj, doc) if o is None else (obj, self.multi(o[1], doc))
         wd[id(obj)] = o
         return obj
 
@@ -244,9 +230,7 @@ class _GLUECLAMP_:
         w = self.wrapdict.get(id(obj))
         if w is not None:
             return w[1]
-        if isinstance(obj, tuple):
-            return self.tuple(*obj)
-        return self.anon(obj)
+        return self.tuple(*obj) if isinstance(obj, tuple) else self.anon(obj)
 
     def multi(self, a, b):
         a = self.getdoc(a)

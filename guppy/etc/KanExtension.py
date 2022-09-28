@@ -70,15 +70,15 @@ class LeftKanExtension:
                     srcb = self.B.source(b)
                     if srcb != t:
                         raise ValueError(
-                            'Arrow [%s] with source %s does not compose with target %s' % (b, srcb, t))
+                            f'Arrow [{b}] with source {srcb} does not compose with target {t}'
+                        )
+
                     t = self.B.target(b)
                 if t != Ftgta:
-                    raise ValueError(
-                        'Arrow %s with target %s does not compose with %s' % (Fa, t, Ftgta))
+                    raise ValueError(f'Arrow {Fa} with target {t} does not compose with {Ftgta}')
             else:
                 if Fsrca != Ftgta:
-                    raise ValueError(
-                        'Source %s does not match target %s' % (Fsrca, Ftgta))
+                    raise ValueError(f'Source {Fsrca} does not match target {Ftgta}')
             for x in XA:
                 add_rule(((srca, x),) + Fa, ((tgta, Xa(x)),))
 
@@ -214,17 +214,12 @@ class LeftKanExtension:
         #                       target: KB[target of a]
 
         def target(e):
-            if len(e) == 1:
-                return self.F.fo(e[0][0])
-            else:
-                return self.B.target(e[-1])
+            return self.F.fo(e[0][0]) if len(e) == 1 else self.B.target(e[-1])
 
         def add_element(e):
             if self.irreducible(e):
                 block.append(e)
                 KB[target(e)].append(e)
-            else:
-                pass
 
         KB = dict([(B, []) for B in self.B.objects])
         block = []
@@ -311,7 +306,7 @@ class LeftKanExtension:
 
     def make_term(self, word):
         sto = self.str_to_obj_table
-        return tuple([sto[s] for s in word.split('.') if s])
+        return tuple(sto[s] for s in word.split('.') if s)
 
 
 class KanAction:
@@ -522,10 +517,7 @@ class CategoryTester:
             b = tuple(b)
             src = cat.graph.source(a[0])
             for (arr, val) in memolist:
-                if arr:
-                    tgt = cat.graph.target(arr[-1])
-                else:
-                    tgt = object
+                tgt = cat.graph.target(arr[-1]) if arr else object
                 if src == tgt:
                     ara = arr + a
                     arb = arr + b

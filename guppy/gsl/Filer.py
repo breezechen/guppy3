@@ -23,9 +23,7 @@ class Filer:
         self.writefile_envs.append(WriteFile(self, node))
 
     def get_info(self):
-        infos = []
-        for e in self.writefile_envs:
-            infos.append('write file: %s' % e.file_name)
+        infos = [f'write file: {e.file_name}' for e in self.writefile_envs]
         return '\n'.join(infos)
 
     def write(self):
@@ -44,15 +42,9 @@ class WriteFile:
         self.file_name = node.arg
 
         node.children_accept(self)
-        if self.node_data is None:
-            data = ''
-        else:
-            data = self.node_data.arg
+        data = '' if self.node_data is None else self.node_data.arg
         self.data = data
-        if self.node_mode is None:
-            mode = ''
-        else:
-            mode = self.node_mode.arg
+        mode = '' if self.node_mode is None else self.node_mode.arg
         self.mode = mode
 
     def visit_text(self, node):
@@ -118,7 +110,7 @@ class _GLUECLAMP_:
 ''' % (tempname, data)
             node = N.node_of_string(X)
             f = self.filer(node)
-            assert f.get_info() == 'write file: %s' % tempname
+            assert f.get_info() == f'write file: {tempname}'
             f.write()
             d = IO.read_file(tempname)
             assert d == data
@@ -136,7 +128,13 @@ class _GLUECLAMP_:
 ..text
 %s
 ..end
-''' % (tempname, data2, tempname+'.3', data3)
+''' % (
+                tempname,
+                data2,
+                f'{tempname}.3',
+                data3,
+            )
+
 
             node = N.node_of_string(X)
             f = self.filer(node)
@@ -145,7 +143,7 @@ class _GLUECLAMP_:
             assert IO.read_file(tempname+self.backup_suffix) == data
             d = IO.read_file(tempname)
             assert d == data2
-            assert IO.read_file(tempname+'.3') == data3
+            assert IO.read_file(f'{tempname}.3') == data3
 
         finally:
             for name in IO.listdir(tempdir):

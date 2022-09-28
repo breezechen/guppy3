@@ -8,7 +8,7 @@ class R_NORELATION:
     r = None
 
     def stra(self, a, safe=True):
-        return '%s.??' % a
+        return f'{a}.??'
 
 
 class R_IDENTITY:
@@ -27,10 +27,7 @@ class R_INDEXVAL:
     code = 2
 
     def stra(self, a, safe=True):
-        if safe:
-            return '%s[%s]' % (a, self.saferepr(self.r))
-        else:
-            return '%s[%r]' % (a, self.r)
+        return f'{a}[{self.saferepr(self.r)}]' if safe else '%s[%r]' % (a, self.r)
 
 
 class R_INDEXKEY:
@@ -100,12 +97,9 @@ class RelationBase(object):
             return id(self.r) < id(other.r)
 
     def __eq__(self, other):
-        if isinstance(other, RelationBase):
-            if self.code != other.code:
-                return False
-            return self.r == other.r
-        else:
+        if not isinstance(other, RelationBase):
             return False
+        return False if self.code != other.code else self.r == other.r
 
     def __str__(self):
         return self.stra('%s')
@@ -228,8 +222,7 @@ class PathsIter:
                 sr = self.mod.sortedrels(paths.IG, path[-1])
                 self.srs[row] = sr
             rel, dst = sr[col]
-            path.append(rel)
-            path.append(dst)
+            path.extend((rel, dst))
         rp = self.mod.Path(paths, path, self.pos, paths.srcname)
         self.pos += 1
         while row >= 0:
@@ -377,9 +370,7 @@ class ShortestPaths:
         return '<... %d more paths ...>' % nummore
 
     def _oh_get_empty_msg(self):
-        if self.numpaths:
-            return '<No more paths>'
-        return None
+        return '<No more paths>' if self.numpaths else None
 
 
 class ShortestGraph:
@@ -391,10 +382,7 @@ class ShortestGraph:
         self.DstSets = DstSets
         self.AvoidEdges = AvoidEdges
         if srcname is None:
-            if Src.count == 1:
-                srcname = mod.srcname_1
-            else:
-                srcname = mod.srcname_n
+            srcname = mod.srcname_1 if Src.count == 1 else mod.srcname_n
         self.srcname = srcname
         if dstname is None:
             dstname = mod.dstname
@@ -409,9 +397,7 @@ class ShortestGraph:
     def __repr__(self):
         lst = []
         for i, p in enumerate(self):
-            lst.append('--- %s[%d] ---' % (self.dstname, i))
-            lst.append(str(p))
-
+            lst.extend(('--- %s[%d] ---' % (self.dstname, i), str(p)))
         return '\n'.join(lst)
 
 
@@ -445,7 +431,7 @@ class _GLUECLAMP_:
                 class r(c, self.RelationBase):
                     repr = self.saferepr
                     saferepr = self.saferepr
-                r.__qualname__ = r.__name__ = 'Based_'+name
+                r.__qualname__ = r.__name__ = f'Based_{name}'
                 table[c.code] = r
         return table
 
@@ -461,8 +447,7 @@ class _GLUECLAMP_:
         for src in Src.nodes:
             for dst in IG[src]:
                 Dst = iso(dst)
-                for rel in self.relations(src, dst):
-                    t.append((rel, Dst))
+                t.extend((rel, Dst) for rel in self.relations(src, dst))
         t.sort(key=lambda x: x[0])
         return t
 
@@ -478,12 +463,11 @@ class _GLUECLAMP_:
     def relation(self, src, dst):
         tab = self.relations(src, dst)
         if len(tab) > 1:
-            r = MultiRelation(tab)
+            return MultiRelation(tab)
         elif not tab:
-            r = self.norelation
+            return self.norelation
         else:
-            r = tab[0]
-        return r
+            return tab[0]
 
     def relations(self, src, dst):
         tab = []
@@ -491,8 +475,7 @@ class _GLUECLAMP_:
             tab.append(self.identity)
         rawrel = self.hv.relate(src, dst)
         for i, rs in enumerate(rawrel):
-            for r in rs:
-                tab.append(self.rel_table[i](r))
+            tab.extend(self.rel_table[i](r) for r in rs)
         if not tab:
             tab = [self.norelation]
         return tab
@@ -505,7 +488,7 @@ class _GLUECLAMP_:
         if src is None:
             Src = self.iso(self.View.root)
             if srcname is None and self.View.root is self.View.heapyc.RootState:
-                srcname = '%sRoot' % self.reprefix
+                srcname = f'{self.reprefix}Root'
         else:
             Src = self.idset_adapt(src)
         if avoid_nodes is None:
@@ -530,8 +513,7 @@ class _GLUECLAMP_:
             U = self.shpathstep(G, U, S, AvoidEdges)
             unseen_ = []
             for i, D in unseen:
-                D_ = D & U
-                if D_:
+                if D_ := D & U:
                     DstSets[i] = D_
                 else:
                     unseen_.append((i, D))

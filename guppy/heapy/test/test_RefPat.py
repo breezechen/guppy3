@@ -22,17 +22,14 @@ class TestCase(support.TestCase):
         #       width ** length, if width >= 1 and length >= 1
 
         dst = []
-        ls = []
-        for i in range(width):
-            ls.append([dst])
+        ls = [[dst] for _ in range(width)]
         ls = [dst] * width
-        for i in range(length-1):
+        for _ in range(length-1):
             xs = []
-            for j in range(width):
+            for _ in range(width):
                 ys = []
                 xs.append(ys)
-                for k in range(width):
-                    ys.append(ls[k])
+                ys.extend(ls[k] for k in range(width))
             ls = xs
         src = ls
         return src, dst
@@ -54,7 +51,7 @@ class RefPatCase(TestCase):
 
         dst = src = []
         lists = [dst]
-        for i in range(5):
+        for _ in range(5):
             src = [src]
             lists.append(src)
 
@@ -398,8 +395,7 @@ Reference Pattern by <[dict of] class>.
         # Test immediate dominators
 
         dst = []
-        src = [dst]
-        src.append([dst])
+        src = [dst, [dst]]
         rp = self.rp(dst, src, depth=10, imdom=1)
         self.asis(rp._.theone, dst)
         self.asis(rp.a.theone, src)

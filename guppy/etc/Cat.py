@@ -43,13 +43,11 @@ class Functor:
 class Function:
     def __init__(self, map, src, tgt):
         f = getattr(map, '__getitem__', None)
-        if callable(f):
-            pass
-        else:
+        if not callable(f):
             f = map
-            if not callable(f):
-                raise TypeError(
-                    'Function: map is neither callable or indexable')
+        if not callable(f):
+            raise TypeError(
+                'Function: map is neither callable or indexable')
         self.f = f
         self.src = src
         self.tgt = tgt
@@ -61,7 +59,7 @@ class Function:
         return self.f(*args, **kwargs)
 
     def __str__(self):
-        return '%s(%s, %s, %s)' % (self.__class__, self.src, self.tgt, self.f)
+        return f'{self.__class__}({self.src}, {self.tgt}, {self.f})'
 
     def asdict(self):
         return dict([(x, self[x]) for x in self.src])
@@ -87,10 +85,10 @@ def check_graph(G):
 
     Gob = G.objects
     for a in G.arrows:
-        if not G.source(a) in Gob:
+        if G.source(a) not in Gob:
             raise ValueError(
                 'Arrow %r has source %r not in graph objects' % (a, G.source(a)))
-        if not G.target(a) in Gob:
+        if G.target(a) not in Gob:
             raise ValueError(
                 'Arrow %r has target %r not in graph objects' % (a, G.target(a)))
 
@@ -100,20 +98,17 @@ def check_rules(R, G):
 
     coms = []
     for (left, right) in R:
-        coms.append(left)
-        coms.append(right)
-
+        coms.extend((left, right))
     for com in coms:
         a0 = None
         for a in com:
             if a not in G.arrows:
                 raise ValueError(
                     'Arrow %r, used in a rule, is not a valid arrow' % (a,))
-            if a0 is not None:
-                if G.source(a) != G.target(a0):
-                    raise ValueError('''\
+            if a0 is not None and G.source(a) != G.target(a0):
+                raise ValueError('''\
 Source of arrow %r (%r) does not match target of arrow %r (%r)''' % (
-                        a, G.source(a), a0, G.target(a0)))
+                    a, G.source(a), a0, G.target(a0)))
             a0 = a
 
 

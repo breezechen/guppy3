@@ -11,10 +11,7 @@ def reptable(tb):
         for i, e in enumerate(r):
             maxlens[i] = max(maxlens[i], len(str(e))+1)
 
-    sumlens = len(maxlens)
-    for s in maxlens:
-        sumlens += s
-
+    sumlens = len(maxlens) + sum(maxlens)
     out = []
     for r in tb:
         if r == '-':
@@ -32,11 +29,8 @@ def reptable(tb):
                     fillright = 0
                 ml = maxlens[i]-1
                 fill = ' '*(ml - len(s))
-                if fillright:
-                    s = fill + s
-                else:
-                    s = s + fill
-                so += s + ' '
+                s = fill + s if fillright else s + fill
+                so += f'{s} '
             out.append(so)
     return maxlens, out
 

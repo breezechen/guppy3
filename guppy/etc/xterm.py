@@ -30,12 +30,12 @@ def master_open():
         return master_fd, tty_name
     for x in 'pqrstuvwxyzPQRST':
         for y in '0123456789abcdef':
-            pty_name = '/dev/pty' + x + y
+            pty_name = f'/dev/pty{x}{y}'
             try:
                 fd = os.open(pty_name, fcntl.O_RDWR)
             except os.error:
                 continue
-            return (fd, '/dev/tty' + x + y)
+            return fd, f'/dev/tty{x}{y}'
     raise os.error('out of pty devices')
 
 # Open the pty slave.  Acquire the controlling terminal.
@@ -76,11 +76,10 @@ def forkxterm(prog=None, options=''):
     pid = os.fork()
     if pid:
         return pid
-    else:
-        os.setsid()
-        pid = xterm(prog, options)
-        if not pid:
-            os._exit(0)
+    os.setsid()
+    pid = xterm(prog, options)
+    if not pid:
+        os._exit(0)
 
 
 def hello():

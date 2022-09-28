@@ -91,9 +91,7 @@ class KnuthBendix:
             lb = b.count(delim)
         if la > lb:
             return 1
-        if la < lb:
-            return 0
-        return a > b
+        return 0 if la < lb else a > b
 
     def make_confluent(self, max_iterations):
         def add_reduction(p, q):
@@ -138,12 +136,10 @@ class KnuthBendix:
                 self.reductions[i] = nullred
                 ru = self.freduce(u)
                 rv = self.freduce(v)
-                if ru != v and ru != rv:
+                if ru not in [v, rv]:
                     urv = (u, rv)
                     newr.append(urv)
                     self.reductions[i] = urv
-                else:
-                    pass
             if len(newr) != self.reductions:
                 assert ('', '') not in newr
                 self.reductions = newr
@@ -193,9 +189,8 @@ Check your equations or specify an higher max_iterations value.'
             (y, __) = xxx_todo_changeme1
             if self.gt(x, y):
                 return 1
-            if x == y:
-                return 0
-            return -1
+            return 0 if x == y else -1
+
         reds.sort(key=functools.cmp_to_key(cmp))
 
     def pp(self):
@@ -238,7 +233,7 @@ def test2():
          ('i.i.i.i',     '1'),
          ]
     R = kb(E, delim='.')
-    T = [['.']+G] + [[y]+[R.reduce('%s.%s' % (y, x)) for x in G] for y in G]
+    T = [['.']+G] + [[y] + [R.reduce(f'{y}.{x}') for x in G] for y in G]
 
     assert T == [
         ['.', '1', '-1', 'i', '-i'],

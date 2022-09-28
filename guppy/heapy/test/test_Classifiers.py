@@ -141,7 +141,7 @@ class SpecialCases(TestCase):
         no([] in (ty(dict) | ty(int)))
         asrt({} in (ty(dict) | ty(int)))
         asrt(dict in (ty(dict) | ty(int) | ty(type(dict))))
-        asrt(list(ty(list) & iso({})) == [])
+        asrt(not list(ty(list) & iso({})))
 
         # When creating ISO classes, we don't want to memoize them
         # which would leak the elements.
@@ -193,7 +193,7 @@ class SpecialCases(TestCase):
         M = 50
 
         # This was the fast case, when only reachable dicts are classified
-        for i in range(N):
+        for _ in range(N):
             print(iso(d3).kind, file=o)
             print(iso(c1.__dict__).kind, file=o)
 
@@ -202,7 +202,7 @@ class SpecialCases(TestCase):
         while 1:
             gc.collect()
             t = clock()
-            for i in range(M):
+            for _ in range(M):
                 iso(d3).kind
                 iso(c1.__dict__).kind
             fast = clock()-t
@@ -217,7 +217,7 @@ class SpecialCases(TestCase):
         # when at least one of them is unreachable.
 
         gc.collect()
-        for i in range(N):
+        for _ in range(N):
             print(iso(*d1).kind, file=o)
             print(iso(c1.__dict__).kind, file=o)
 
@@ -225,7 +225,7 @@ class SpecialCases(TestCase):
         # Now measure it
 
         t = clock()
-        for i in range(M):
+        for _ in range(M):
             iso(*d1).kind
             iso(c1.__dict__).kind
         slow = clock()-t
@@ -236,13 +236,13 @@ class SpecialCases(TestCase):
         # A succession of different unreachable dicts.
 
         gc.collect()
-        dn = self.View.immnodeset([{} for i in range(N)])
+        dn = self.View.immnodeset([{} for _ in range(N)])
         for i in range(N):
             print(iso(list(dn)[i]).kind, file=o)
 
         # Now measure it
         gc.collect()
-        dn = self.View.immnodeset([{} for i in range(M)])
+        dn = self.View.immnodeset([{} for _ in range(M)])
 
         t = clock()
         for i in range(M):
@@ -254,12 +254,12 @@ class SpecialCases(TestCase):
         # self.assertTrue(slow <= 1.5*fast)
 
         # Partition was likewise slow for unreachable dicts
-        dn = self.View.immnodeset([{} for i in range(N)])
+        dn = self.View.immnodeset([{} for _ in range(N)])
         gc.collect()
         print([x[0] for x in Use.Clodo.classifier.partition(dn)], file=o)
 
         # Now measure it
-        dn = self.View.immnodeset([{} for i in range(M)])
+        dn = self.View.immnodeset([{} for _ in range(M)])
         gc.collect()
         t = clock()
         [x[0] for x in Use.Clodo.classifier.partition(dn)]
@@ -381,7 +381,7 @@ dict (no owner)
         N = 1000
         while 1:
             t = clock()
-            for i in range(N):
+            for _ in range(N):
                 s.referrers
             fast = clock()-t
             if fast >= 0.5:
@@ -389,13 +389,13 @@ dict (no owner)
             N *= 2      # CPU is too fast to get good resolution, try more loops
 
         t = clock()
-        for i in range(N):
+        for _ in range(N):
             self.View.rg.domain_covers([a])
             self.View.rg[a]
         faster = clock()-t
         s = iso(*b)
         t = clock()
-        for i in range(N):
+        for _ in range(N):
             s.referrers
         slow = clock() - t
         self.assertTrue(not slow > fast * 4)
@@ -408,20 +408,23 @@ dict (no owner)
 
         iso = self.iso
         hp = self.Use
-        d = {}
         k = ('k',)
         v = tuple(vlist)  # Make sure v is not optimized to a constant
 
-        d[k] = v
-        d[v] = v
-
+        d = {k: v, v: v}
         rck = grc(k)
         rcv = grc(v)
 
         s = iso(v)
 
-        self.assertTrue(s.byvia.kind == hp.Via("_.f_locals['v']", "_[('k',)]", "_[('v',)]", '_.keys()[1]') or
-                        s.byvia.kind == hp.Via("_.f_locals['v']", "_[('k',)]", "_[('v',)]", '_.keys()[0]'))
+        self.assertTrue(
+            s.byvia.kind
+            in [
+                hp.Via("_.f_locals['v']", "_[('k',)]", "_[('v',)]", '_.keys()[1]'),
+                hp.Via("_.f_locals['v']", "_[('k',)]", "_[('v',)]", '_.keys()[0]'),
+            ]
+        )
+
 
         del s
         gc.collect()

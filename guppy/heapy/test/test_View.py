@@ -170,37 +170,6 @@ class GCCase(TestCase):
         # FIXME MAKE NEW TEST
         return
 
-        import gc
-        View = self.View
-        hv = View.hv
-        drg = View.nodegraph()
-
-        def clear_drg():
-            if drg.is_sorted:
-                drg.clear()
-            else:
-                pass
-        _clear_drg_hook = View.gchook(clear_drg)
-
-        hv.update_dictowners(drg)
-        gc.collect()
-        lendrg = len(drg)
-        self.assertTrue(lendrg > 0)    # Before any use, it will not be cleared
-        # Now it is used by taking its length
-        gc.collect()
-        self.aseq(len(drg), 0)
-
-        byclodo = hv.cli_clodo(drg, {})
-
-        class C:
-            pass
-        c = C()
-
-        byclodo.partition([c.__dict__])
-        self.assertTrue(len(drg) > 0)
-        gc.collect()
-        self.assertTrue(len(drg) == 0)
-
     def test_gc_rg(self):
         # Test automatic reclamation issues for referrer nodegraph
         iso = self.iso
