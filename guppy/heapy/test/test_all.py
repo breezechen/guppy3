@@ -25,7 +25,7 @@ others = (
 
 def test_main(debug=False):
     for name in autotests:
-        testname = 'guppy.heapy.test.test_'+name
+        testname = f'guppy.heapy.test.test_{name}'
         try:
             del sys.modules[testname]
         except KeyError:

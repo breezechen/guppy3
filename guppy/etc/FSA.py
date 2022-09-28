@@ -34,13 +34,13 @@ class FiniteAutomaton:
         ris = []
         for k, v in x:
             if isinstance(v, CompositeState):
-                for vi in v:
-                    ris.append((k, vi))
+                ris.extend((k, vi) for vi in v)
             else:
                 ris.append((k, v))
         return ris
 
     def make_deterministic(self):
+        l = []
         # Resolve all unresolved composite states so we become deterministic
 
         while self.unresolved_composites:
@@ -48,7 +48,6 @@ class FiniteAutomaton:
             self.unresolved_composites = []
             for c in composites:
                 ds = {}
-                l = []
                 for a in c:
                     for k, v in self.get_row_items(a):
                         ds.setdefault(k, []).append(v)
@@ -83,8 +82,7 @@ class FiniteAutomaton:
         tc = {}
         tck = {}
         for k, v in list(self.table.items()):
-            trans = list(v.keys())
-            trans.sort()
+            trans = sorted(v.keys())
             trans = tuple(trans)
             ks = tc.get(trans)
             if ks is None:
@@ -218,14 +216,12 @@ class FiniteAutomaton:
             return cs
 
     def pp(self):
-        ks = list(self.table.keys())
-        ks.sort()
+        ks = sorted(self.table.keys())
         num = dict([(s, i) for i, s in enumerate(ks)])
         for s in ks:
             k = self.table[s]
             print('%d: %s' % (num[s], s))
-            cs = list(k.keys())
-            cs.sort()
+            cs = sorted(k.keys())
             for c in cs:
                 v = k[c]
                 print('   %r  -> #%d: %s' % (c, num[v], v))

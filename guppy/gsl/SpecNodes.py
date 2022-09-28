@@ -70,10 +70,7 @@ class FileEnv:
         mod = env.mod
         self.mod = mod
         self.name = self.filename = node.arg
-        self.subjects = {}
-        for s in env.get_predefined_subjects(self):
-            self.subjects[s.name] = s
-
+        self.subjects = {s.name: s for s in env.get_predefined_subjects(self)}
         file = Subject(self, node, self.name)
 
         node.children_accept(file)
@@ -94,9 +91,9 @@ class FileEnv:
     def error_node(self, node, msg, exception=None):
         index = node.index
         lineno = index + 1
-        print('%s:%s:' % (self.filename, lineno))
+        print(f'{self.filename}:{lineno}:')
         print('    %r' % self.get_line(index))
-        print('    %s' % msg)
+        print(f'    {msg}')
         print()
 
     def find_subject(self, node, name):
@@ -120,7 +117,7 @@ class FileEnv:
         return subject
 
     def get_aspect_subject(self, env, node):
-        name = env.name+'::'+node.tag
+        name = f'{env.name}::{node.tag}'
         return self.get_subject(name)
 
 
@@ -215,8 +212,11 @@ class SpecNode(object):
 
     def __str__(self):
         return '%s(%r,%r,%s)' % (
-            self.__class__.__name__, self.tag, self.arg,
-            '(%s)' % (','.join([str(c) for c in self.children])))
+            self.__class__.__name__,
+            self.tag,
+            self.arg,
+            f"({','.join([str(c) for c in self.children])})",
+        )
 
     def arg_accept(self, visitor, prefix='visit_'):
         if self.arg:
@@ -244,13 +244,12 @@ class SpecNode(object):
     def accept(self, visitor, prefix='visit_'):
         m = getattr(visitor, (prefix+self.tag), None)
         if m is None:
-            m = getattr(visitor, (prefix+'default'), None)
-            if m is None:
-                msg = 'accept: unknown: %r, %r  in %r' % (
-                    prefix, self.tag, visitor)
-                print(msg)
-                raise ValueError(msg)
-                return
+            m = getattr(visitor, f'{prefix}default', None)
+        if m is None:
+            msg = 'accept: unknown: %r, %r  in %r' % (
+                prefix, self.tag, visitor)
+            print(msg)
+            raise ValueError(msg)
         m(self)
 
     def error(self, msg, node=None):
@@ -302,7 +301,7 @@ class SpecNode(object):
             but make sure there are no more children.
             '''
         if self.children:
-            raise SyntaxError('No children nodes expected in node: %s' % self)
+            raise SyntaxError(f'No children nodes expected in node: {self}')
         return self.arg.strip()
 
     def get_namearg(self):
@@ -323,9 +322,10 @@ class SpecNode(object):
 
             def addattr(tag, attr, node):
                 if tag in attrs:
-                    node.error('Duplicate attribute: %s' % attr)
+                    node.error(f'Duplicate attribute: {attr}')
                 else:
                     attrs[tag] = attr
+
         else:
             attrs = []
 
@@ -381,9 +381,9 @@ class Source:
             if src is not None:
                 filename = src.filename
                 linetext = src.get_line(index=index)
-            print('%s:%s:' % (filename, index+1))
+            print(f'{filename}:{index + 1}:')
             if linetext:
-                print('    %s' % linetext)
+                print(f'    {linetext}')
 
     def error(self, message, context=None, exception=None, more=(), harmless=0):
         self.error_reports.append(
@@ -395,14 +395,14 @@ class Source:
 
         self.errmsg_context(context)
         if harmless:
-            print('*   %s' % message)
+            print(f'*   {message}')
         else:
-            print('*** %s' % message)
+            print(f'*** {message}')
         print()
 
         for msg, ctx in more:
             self.errmsg_context(ctx)
-            print('    %s' % msg)
+            print(f'    {msg}')
             print()
 
         if self.debug:
@@ -417,13 +417,12 @@ class Source:
     def get_line(self, index):
         if self.lines is None:
             if self.string is None:
-                if self.filename:
-                    try:
-                        with open(self.filename) as f:
-                            self.string = f.read()
-                    except Exception:
-                        return ''
-                else:
+                if not self.filename:
+                    return ''
+                try:
+                    with open(self.filename) as f:
+                        self.string = f.read()
+                except Exception:
                     return ''
             self.lines = self.string.split('\n')
         return self.lines[index]
@@ -508,15 +507,13 @@ class _GLUECLAMP_:
         equpos = tag.find('=', 0, textpos)
         colonpos = tag.find(':', 0, textpos)
         if equpos != -1 and (colonpos == -1 or equpos < colonpos):
-            tag, arg = (tag[:equpos].strip()+'=',
-                        tag[equpos+1:].strip())
+            tag, arg = f'{tag[:equpos].strip()}=', tag[equpos+1:].strip()
         else:
             if colonpos == -1:
-                if not ' ' in tag[:textpos] or textpos >= len(tag.rstrip()):
+                if ' ' not in tag[:textpos] or textpos >= len(tag.rstrip()):
                     colonpos = textpos
                 else:
-                    raise SyntaxError(
-                        'No colon in spaced tag in node %s' % dtree)
+                    raise SyntaxError(f'No colon in spaced tag in node {dtree}')
             tag, arg = (tag[:colonpos].strip(),
                         tag[colonpos+1:]
                         )
@@ -549,10 +546,7 @@ class _GLUECLAMP_:
     def node_of_tatci(self, tag, arg, text, children=(), index=0, src=None):
         if text:
             if tag == 'text':
-                if arg:
-                    arg = arg + '\n' + text
-                else:
-                    arg = text
+                arg = arg + '\n' + text if arg else text
             else:
                 children = (self.node_of_taci(
                     'text', text, (), index, src),) + children
@@ -565,10 +559,7 @@ class _GLUECLAMP_:
         # - a 'block' with children being a sequence of char and text nodes,
         #       if text contained ascii and non-ascii characters
         nodes = self.nodes_of_text(text)
-        if len(nodes) == 1:
-            return nodes[0]
-        else:
-            return self.node_of_taci('block', '', nodes)
+        return nodes[0] if len(nodes) == 1 else self.node_of_taci('block', '', nodes)
 
     def nodes_of_text(self, text):
         # Returns a sequence of nodes, encoding text.
@@ -598,7 +589,7 @@ class _GLUECLAMP_:
             '../../specs')
         main_dt_name = root.os.path.join(specdir, "docexample.gsl")
         if not root.os.path.exists(main_dt_name):
-            print('%s does not exist, skipping test' % main_dt_name)
+            print(f'{main_dt_name} does not exist, skipping test')
             return
 
         env = self.SpecEnv(self)
@@ -612,7 +603,7 @@ class _GLUECLAMP_:
     def unparse_head(self, level, tag, arg, text):
         head = tag
         if arg:
-            head = head + ': ' + arg
+            head = f'{head}: {arg}'
         if text:
             head = head + '\n' + text
         tag = self.DottedTree.unparse_tag(level, head)

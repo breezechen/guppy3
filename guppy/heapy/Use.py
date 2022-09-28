@@ -40,11 +40,17 @@ class _GLUECLAMP_(guppy.etc.Glue.Interface):
         # Used for prefixing the result of repr() of various objects
         # so it becomes possible to evaluate it in a typical environment.
         import __main__
-        for k, v in list(__main__.__dict__.items()):
-            if (isinstance(v, self.__class__) and
-                    getattr(v, '_share', None) is self._share):
-                return '%s.' % k
-        return self.default_reprefix
+        return next(
+            (
+                f'{k}.'
+                for k, v in list(__main__.__dict__.items())
+                if (
+                    isinstance(v, self.__class__)
+                    and getattr(v, '_share', None) is self._share
+                )
+            ),
+            self.default_reprefix,
+        )
 
     def _get_Root(self):
         """Root: RootStateType
@@ -85,7 +91,7 @@ options. Currently the following are provided:
         'L'     Generate a listing of the entire doc strings."""
 
         obj = self
-        return self._root.guppy.etc.Help.dir(obj, opts)
+        return obj._root.guppy.etc.Help.dir(obj, opts)
 
     def _get_doc(self):
         """Overview documentation for top level Heapy object.
@@ -166,8 +172,7 @@ References
             h.firstheader = 'Data from unreachable objects'
 
             if rel:
-                h.firstheader += ' relative to: %s' %\
-                                 self.ctime(self.relheapu.timemade)
+                h.firstheader += f' relative to: {self.ctime(self.relheapu.timemade)}'
             h.firstheader += '.\n'
 
         return h
@@ -256,16 +261,12 @@ References
             # it makes a big readahead (regardless of buffering setting).
             # But since .__next__() (typically) is much faster, we use it
             # per default unless use_readline is set.
-            if use_readline:
-                get_line = fn.readline
-            else:
-                get_line = fn.__next__
-
+            get_line = fn.readline if use_readline else fn.__next__
             trows = []
             line = get_line()
             if not line:
                 raise StopIteration
-            endline = '.end: %s' % line
+            endline = f'.end: {line}'
             try:
                 while line:
                     trows.append(line)
@@ -279,6 +280,7 @@ References
 
             def get_trows():
                 return trows
+
         else:
             raise TypeError(
                 'Argument should be a string, file or an iterable yielding strings.')

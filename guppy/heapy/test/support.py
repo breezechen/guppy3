@@ -60,8 +60,7 @@ def run_suite(suite, testclass=None):
             if testclass is None:
                 msg = "errors occurred; run in verbose mode for details"
             else:
-                msg = "errors occurred in %s.%s" \
-                      % (testclass.__module__, testclass.__name__)
+                msg = f"errors occurred in {testclass.__module__}.{testclass.__name__}"
             raise TestFailed(msg)
         raise TestFailed(err)
 

@@ -21,7 +21,7 @@ if has_numpy:
         return list(map(int, numpy.random.random_integers(low, high, [length])))
 else:
     def random_integers_list(low, high, length):
-        return [random.randint(low, high) for i in range(length)]
+        return [random.randint(low, high) for _ in range(length)]
 
 
 Empty = immbitset()
@@ -72,7 +72,7 @@ def distributive(a, b, c):
     assert a | (b & c) == (a | b) & (a | c)
     assert a & (b | c) == (a & b) | (a & c)
     assert (a & b) | (b & c) | (c & a) == (a | b) & (b | c) & (c | a)
-    assert not (a & b == a & c and a | b == a | c) or (b == c)
+    assert a & b != a & c or a | b != a | c or b == c
 
 
 def test_set_operations(as_, bs, cs):
@@ -91,13 +91,14 @@ def test_set_operations(as_, bs, cs):
 def test_set_sub(as_, bs):
     def imp(a, b):
         assert not a or b
+
     for a in as_:
         for b in bs:
             imp(len(a) != len(b), a != b)
             imp(a < b, b > a and (not b < a))
             imp(a <= b, b >= a and (a < b or a == b) and not a > b)
-            imp(a == b, a <= b and a >= b and not a != b and not b != a)
-            imp(a != b, not a == b and not b == a)
+            imp(a == b, a <= b and a >= b and a == b and b == a)
+            imp(a != b, a != b and b != a)
             imp(a > b, b < a and not b > a)
             imp(a >= b, b <= a and (b < a or a == b) and not a < b)
 
@@ -132,14 +133,11 @@ def test_set_convert(as_, bs):
 def eltime(f, args=(), N=1, retx=0):
     r = list(range(N))
     starttime = clock()
-    for i in r:
+    for _ in r:
         x = f(*args)
     endtime = clock()
     elapsed = endtime - starttime
-    if retx:
-        return elapsed, x
-    else:
-        return elapsed
+    return (elapsed, x) if retx else elapsed
 
 
 '.nython on'
@@ -169,7 +167,7 @@ def add(a, b):
 
 def randint(lim=1 << 30):
     # Return a random signed int
-    return int(random.randrange(-lim, lim))
+    return random.randrange(-lim, lim)
 
 
 def randlong():
@@ -179,8 +177,7 @@ def randlong():
     c = randint()
     d = randint()
     bsh = randint() & 255
-    r = (a * b << ash) + (c * d << bsh)
-    return r
+    return (a * b << ash) + (c * d << bsh)
 
 
 def dictset(l):
@@ -193,16 +190,14 @@ def dictset(l):
 
 def dslist(l):
     ds = dictset(l)
-    ks = list(ds.keys())
-    ks.sort()
-    return ks
+    return sorted(ds.keys())
 
 
 def randlist(n, amp):
     ' randlist(n, amp) -> list of n unique random ints in [-amp,amp]'
     ds = {}
     rng = []  # To become a non-sorted list of unique random ints
-    for i in range(10000):
+    for _ in range(10000):
         while 1:
             b = randint(50000)
             if b not in ds:
@@ -338,18 +333,18 @@ class Test:
         print(ms, int(ms), int(ms), file=f)
 
         ms |= -1
-        print(ms, int(ms), file=f)
+        print(ms, ms, file=f)
         ms &= -2
-        print(ms, int(ms), file=f)
+        print(ms, ms, file=f)
         ms ^= -4
-        print(ms, int(ms), file=f)
+        print(ms, ms, file=f)
 
         ms |= -1
-        print(ms, int(ms), file=f)
+        print(ms, ms, file=f)
         ms &= -2
-        print(ms, int(ms), file=f)
+        print(ms, ms, file=f)
         ms ^= -4
-        print(ms, int(ms), file=f)
+        print(ms, ms, file=f)
 
         ms |= bitset(-1)
         print(ms, int(ms), file=f)
@@ -407,27 +402,26 @@ ImmBitSet([-1, 4])
 
     def test2(self):
         # Test standard operators (not-inplace)
-        for a in [randlong() for i in range(10)]:
-            for b in [randlong() for j in range(10)]:
+        for a in [randlong() for _ in range(10)]:
+            for b in [randlong() for _ in range(10)]:
                 ts = []
                 for ta in (a, bitset(a), bitsmut(a)):
                     for tb in (b, bitset(b), bitsmut(b)):
-                        tr = []
-                        tr.append(ta | tb)
-                        tr.append(ta & tb)
-                        tr.append(ta ^ tb)
+                        tr = [
+                            ta | tb,
+                            ta & tb,
+                            ta ^ tb,
+                            ta | ~tb,
+                            ta & ~tb,
+                            ta ^ ~tb,
+                            ~ta | tb,
+                            ~ta & tb,
+                            ~ta ^ tb,
+                            ~ta | ~tb,
+                            ~ta & ~tb,
+                            ~ta ^ ~tb,
+                        ]
 
-                        tr.append(ta | ~tb)
-                        tr.append(ta & ~tb)
-                        tr.append(ta ^ ~tb)
-
-                        tr.append(~ta | tb)
-                        tr.append(~ta & tb)
-                        tr.append(~ta ^ tb)
-
-                        tr.append(~ta | ~tb)
-                        tr.append(~ta & ~tb)
-                        tr.append(~ta ^ ~tb)
                         ts.append(tr)
 
                 for tr in ts[1:]:
@@ -450,9 +444,8 @@ ImmBitSet([-1, 4])
                 elif op & 4:
                     ta ^= tp
                 for tb in (b, bitset(b), bitsmut(b)):
-                    tr = []
                     tb |= ta
-                    tr.append(int(tb))
+                    tr = [int(tb)]
                     tb &= ta
                     tr.append(int(tb))
                     tb ^= ta
@@ -503,9 +496,7 @@ ImmBitSet([-1, 4])
             bits[bit-randint() % 15] = 1
             bits[bit-randint() % 15] = 1
         bits = list(bits)
-        sbits = list(bits)
-        sbits.sort()
-
+        sbits = sorted(bits)
         def dictset(bits):
             return dict([(bit, 1) for bit in bits])
 
@@ -597,20 +588,20 @@ ImmBitSet([-1, 4])
         f = io.StringIO()
 
         a = bitsmut(0)
-        print(str(a), file=f)
+        print(a, file=f)
         a.append(1)
-        print(str(a), a.pop(), str(a), file=f)
+        print(a, a.pop(), a, file=f)
         a.append(1)
-        print(str(a), a.pop(-1), str(a), file=f)
+        print(a, a.pop(-1), a, file=f)
         a.append(1)
-        print(str(a), a.pop(0), str(a), file=f)
+        print(a, a.pop(0), a, file=f)
         a.append(1)
         a.append(2)
         a.append(3)
-        print(str(a), a.pop(), str(a), file=f)
-        print(str(a), a.pop(0), str(a), file=f)
+        print(a, a.pop(), a, file=f)
+        print(a, a.pop(0), a, file=f)
         a.remove(2)
-        print(str(a), file=f)
+        print(a, file=f)
 
         print(f.getvalue())
         assert f.getvalue() == """\
@@ -646,8 +637,7 @@ MutBitSet([])
         def tms(rng, f=f):
             ms = bitsmut(0)
             t = eltime(f, (ms, rng))
-            srng = list(rng)
-            srng.sort()
+            srng = sorted(rng)
             assert ms == bitset(srng)
             return t
 
@@ -780,17 +770,15 @@ MutBitSet([])
             rng = list(range(N))
             ms |= rng
             for popix in (-1, 0):
-                for j in range(N):
+                for _ in range(N):
                     ms.pop(popix)
                 ms |= rng
             # Now should be stable..
             indisize = ms._indisize
             for popix in (-1, 0):
                 for i in range(0, N*10, N):
-                    pops = []
-                    for j in range(N):
-                        pops.append(ms.pop(popix))
-                    assert list(ms) == []
+                    pops = [ms.pop(popix) for _ in range(N)]
+                    assert not list(ms)
                     if popix == -1:
                         pops.reverse()
                     assert pops == rng
@@ -818,7 +806,7 @@ MutBitSet([])
         else:
             raise AssertionError('expected ValueError for remove')
         ms.append(0)
-        assert list(~ms) == []
+        assert not list(~ms)
         try:
             ms.append(0)
         except ValueError:
@@ -935,7 +923,7 @@ MutBitSet([])
         any = [Empty, Omega, bitset([0]),
                bitset(randlong()),
                bitset(randlong())] + [a ^ randlong() for a in any]
-        any = any + [bitsmut(a) for a in any]
+        any += [bitsmut(a) for a in any]
         for a in any:
             # Empty and Omega are the least and greatest elements
             assert Empty <= a <= Omega
@@ -1061,26 +1049,26 @@ MutBitSet([])
         print('done')
 
     def test21(self):
-        # Test bitset as dict key - i.e. hashing, equality
-        D = {}
         a = bitrange(1)
         b = bitrange(1)
         c = ~a
         d = ~b
-        D[a] = 1
-        D[c] = -1
+        D = {a: 1, c: -1}
         assert D[b] == D[a] == 1
         assert D[c] == D[d] == -1
 
     def test22(self):
         # Test pickling
-        any = [bitset() for x in range(10)]
-        any = any + [bitrange(x, y, z)
-                     for x in (-1000, 0, 1000)
-                     for y in (2000,)
-                     for z in (1, 3, 300)]
-        any = any + [~x for x in any]
-        any = any + [bitsmut(x) for x in any]
+        any = [bitset() for _ in range(10)]
+        any += [
+            bitrange(x, y, z)
+            for x in (-1000, 0, 1000)
+            for y in (2000,)
+            for z in (1, 3, 300)
+        ]
+
+        any += [~x for x in any]
+        any += [bitsmut(x) for x in any]
         for a in any:
             for bin in (0, 1):
                 da = pickle.dumps(a, bin)
@@ -1267,7 +1255,7 @@ MutBitSet([])
     def test27(self):
         # slices
         for b in (bitset(64), bitrange(64), bitset(abs(randlong()))):
-            for st in (b, b.mutcopy()):
+            for _ in (b, b.mutcopy()):
                 for i in (1, 2, 3, 30, 31, 32, 33, 34, 63, 64, 65):
                     assert b[:i] == bitset(list(b)[:i])
                     assert b[-i:] == bitset(list(b)[-i:])
@@ -1315,7 +1303,7 @@ MutBitSet([])
 
         all = 0, -1, 1, -2, 2, randlong(), -randlong()
         all = [bitsmut(a) for a in all]
-        all = all + [bitsmut(a) for a in all]
+        all += [bitsmut(a) for a in all]
         for a in all:
             a = a.mutcopy()
             aa = a.mutcopy()
@@ -1401,7 +1389,7 @@ MutBitSet([])
         assert len(ns) == 3
         ns.clear()
         assert len(ns) == 0
-        assert list(ns) == []
+        assert not list(ns)
 
     def test31(self):
         # Test nodeset, element-wise operations & object deallocation w. gc
@@ -1504,7 +1492,7 @@ MutBitSet([])
 
         s = H([e1, e2])
 
-        assert e1 in s and e2 in s and not e3 in s
+        assert e1 in s and e2 in s and e3 not in s
 
         s3 = H([e1, e3])
 
@@ -1599,15 +1587,18 @@ MutBitSet([])
     def test35(self):
         # Test bitset inheritance
 
-        for i in range(2):
+        for _ in range(2):
             # An error didn't show until second time around
 
-            for H in ImmBitSet, MutBitSet:
+            for H in (ImmBitSet, MutBitSet):
+
+
+
                 class X(H):
                     bitnames = ['red', 'green', 'blue']
 
-                    def __new__(clas, *args):
-                        return H.__new__(clas, [clas.bitnames.index(x) for x in args])
+                    def __new__(cls, *args):
+                        return H.__new__(cls, [cls.bitnames.index(x) for x in args])
 
                     def __iter__(self):
                         for bit in H.__iter__(self):
@@ -1618,6 +1609,7 @@ MutBitSet([])
 
                     def __eq__(self, other):
                         return str(self) == str(other)
+
 
                 x = X()
                 x = X('red', 'blue')
@@ -1686,9 +1678,7 @@ class MemStat:
 
 
 def test_nums(numbers, dump=None):
-    enufuncs = []
-    for n in numbers:
-        enufuncs.append((n, getattr(t, 'test%d' % n)))
+    enufuncs = [(n, getattr(t, 'test%d' % n)) for n in numbers]
     for n, f in enufuncs:
         print('Test #%d' % n)
         f()

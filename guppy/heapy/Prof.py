@@ -26,10 +26,10 @@ def sizestring(value):
         value /= 1000
         i += 1
     s = str(int(round(value)))+suffixes[i]
-    if s.endswith('000'+suffixes[i]):
+    if s.endswith(f'000{suffixes[i]}'):
         s = str(int(round(value/1000)))+suffixes[i+1]
     if sign == -1:
-        s = '-' + s
+        s = f'-{s}'
     return s
 
 
@@ -111,10 +111,7 @@ class ClickButton(Button):
 
     def _event_button(self, event=None):
         self._command()
-        if event is not None:
-            delay = self._firstdelay
-        else:
-            delay = self._thendelay
+        delay = self._firstdelay if event is not None else self._thendelay
         self._after = self.after(delay, self._event_button)
 
     def _event_release(self, event):
@@ -272,10 +269,7 @@ class ProfileRow:
         if color is not None:
             self.set_color(color)
         self.rsizevar.set(rsize)
-        if rpercent is None:
-            rpercent = ''
-        else:
-            rpercent = str(int(round(rpercent)))
+        rpercent = '' if rpercent is None else str(int(round(rpercent)))
         self.rpercentvar.set(rpercent)
 
         self.dsizevar.set(dsize)
@@ -430,7 +424,6 @@ class AxisControl:
 
             rangeval.grid(row=row, column=1, padx=3, pady=3)
             if autocommand:
-                pass
                 autobutton.grid(row=row, column=2)
 
     def cmd_range(self):
@@ -440,9 +433,11 @@ class AxisControl:
         str = self.rangevar.get()
         try:
             rng = stringsize(str)
-            if rng not in self.scale_table:
-                if not 1 <= rng <= self.scale_table[-1]:
-                    raise ValueError
+            if (
+                rng not in self.scale_table
+                and not 1 <= rng <= self.scale_table[-1]
+            ):
+                raise ValueError
         except ValueError:
             self.frame.bell()
             self.errorbox("""\
@@ -476,16 +471,13 @@ Maximum range is 1T.""")
     def range_change(self, d):
         range = self.range
         srange = self.scale_by_table(range)
-        if srange > range:
-            if d > 0:
-                d -= 1
+        if srange > range and d > 0:
+            d -= 1
         i = self.scale_table.index(srange)
         i += d
         if i >= len(self.scale_table):
             i = len(self.scale_table) - 1
-        if i < 0:
-            i = 0
-
+        i = max(i, 0)
         self.setrange(self.scale_table[i])
 
     def setrange(self, range):
@@ -613,8 +605,6 @@ class Marker:
         self.entered = 0
         if not self.moving:
             self.setcursor(self.ocursor)
-        elif not (self.fraloy <= event.y_root < self.frahiy):
-            pass
 
     def event_motion(self, event):
         self.has_moved = 1
@@ -715,7 +705,7 @@ class Marker:
             prevx = self.dislox
 
         markx = self.d.canxscaled(self.xmarker) - \
-            self.d.drawingarea.canvasx(0) + self.dislox
+                self.d.drawingarea.canvasx(0) + self.dislox
 
         dx = curx - prevx
         l = r = 1
@@ -741,22 +731,21 @@ class Marker:
                 l = 0
             elif curx < self.dislox:
                 r = 0
-        else:
-            if not (self.dislox <= curx < self.dishix and
-                    self.disloy <= cury < self.dishiy):
-                l = r = 0
-                stop = 1
+        elif (
+            not self.dislox <= curx < self.dishix
+            or not self.disloy <= cury < self.dishiy
+        ):
+            l = r = 0
+            stop = 1
 
         if l and r:
             self.setcursor('sb_h_double_arrow')
         elif l:
             self.setcursor('sb_left_arrow')
-            if dx > 0:
-                dx = 0
+            dx = min(dx, 0)
         elif r:
             self.setcursor('sb_right_arrow')
-            if dx < 0:
-                dx = 0
+            dx = max(dx, 0)
         else:
             self.setcursor('dot')
             dx = 0
@@ -965,7 +954,7 @@ class Display:
         self.marks = []
 
     def bind_motion(self, function):
-        if self.event_motion_id == None:
+        if self.event_motion_id is None:
             self.event_motion_id = self.frame.bind_all(
                 '<Motion>', self.event_motion, add='+')
         self.bound_motions[function] = self.bound_motions.get(function, 0) + 1
@@ -1010,12 +999,10 @@ class Display:
 
     def limitx(self, x):
         lo = 0
-        hi = max(0, self.numstats-1)
         if x < lo:
             return lo
-        if x > hi:
-            return hi
-        return x
+        hi = max(0, self.numstats-1)
+        return hi if x > hi else x
 
     def resize(self, dx, dy):
         x = self.botx + dx

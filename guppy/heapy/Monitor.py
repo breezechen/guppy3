@@ -79,9 +79,8 @@ class Handler(socketserver.StreamRequestHandler):
             if p is None:
                 if self.promptstate:
                     break
-                else:
-                    time.sleep(1)
-                    continue
+                time.sleep(1)
+                continue
             if p is CONN_CLOSED:
                 raise EOFError
             if p[0] == 'DATA':
@@ -112,7 +111,7 @@ class Handler(socketserver.StreamRequestHandler):
         return ''
 
     def get_val(self, expr):
-        data = self.browser_cmd('dump %s' % expr)
+        data = self.browser_cmd(f'dump {expr}')
         return pickle.loads(data)
 
     def handle(self):
@@ -218,14 +217,12 @@ class MonitorConnection(cmd.Cmd):
             if '%' in line:
                 ii = 1
                 for tmpArg in args[1:]:
-                    line = line.replace("%" + str(ii),
-                                        tmpArg)
-                    line = line.replace('%>=' + str(ii),
-                                        ' '.join(args[ii:]))
+                    line = line.replace(f"%{str(ii)}", tmpArg)
+                    line = line.replace(f'%>={str(ii)}', ' '.join(args[ii:]))
                     ii = ii + 1
                 line = line.replace("%*", ' '.join(args[1:]))
             else:
-                line = line + ' ' + ' '.join(args[1:])
+                line = f'{line} ' + ' '.join(args[1:])
             args = line.split()
         # split into ';;' separated commands
         # unless it's an alias command
@@ -287,7 +284,7 @@ the same interpreter process that the Monitor itself.""")
             print('''\
 Error: Can not interrupt this remote connection (uses Python < 2.4)''')
         else:
-            print('Sending KeyboardInterrupt to connection %s.' % arg)
+            print(f'Sending KeyboardInterrupt to connection {arg}.')
             c.send_cmd(KEYBOARDINTERRUPT)
 
     def help_ki(self):
@@ -306,10 +303,10 @@ time.sleep(). Sometimes using several ki commands helps.""")
 
     def do_lc(self, arg):
         table = [['CID', 'PID', 'ARGV']]
-        for cid, con in list(self.monitor.connections.items()):
-            table.append([cid,
-                          con.get_ps('target.pid'),
-                          con.get_ps('target.sys.argv')])
+        table.extend(
+            [cid, con.get_ps('target.pid'), con.get_ps('target.sys.argv')]
+            for cid, con in list(self.monitor.connections.items())
+        )
 
         ptable(table, self.stdout)
 
@@ -377,14 +374,14 @@ class Monitor:
             self.ids = 1
             self.monitor_connection.conid = self.ids
         else:
-            self.ids = max([1]+[c for c in list(self.connections.keys())])+1
+            self.ids = max([1] + list(list(self.connections.keys()))) + 1
         return self.ids
 
     def add_connection(self, connection):
         hid = self.newid()
         self.connections[hid] = connection
         connection.monitor_id = hid
-        self.print_async('*** Connection %s opened ***' % hid)
+        self.print_async(f'*** Connection {hid} opened ***')
 
     def print_async(self, text):
         """ Print text only if we are waiting for input,
@@ -398,8 +395,7 @@ class Monitor:
         del self.connections[connection.monitor_id]
         if connection is self.connection:
             self.set_connection(self.monitor_connection)
-        self.print_async('*** Connection %s closed ***' %
-                         connection.monitor_id)
+        self.print_async(f'*** Connection {connection.monitor_id} closed ***')
 
     def run(self):
         try:

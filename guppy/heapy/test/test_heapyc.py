@@ -44,9 +44,12 @@ class TestHeapView(TestCase):
         x = 'x'
         newroot = [x]
 
+
+
         class HV(HeapView):
-            def __new__(self):
+            def __new__(cls):
                 return HeapView.__new__(HV, newroot, ())
+
 
         hv = HV()
         assert hv.heap() == self.nodeset([x, newroot])
@@ -210,7 +213,7 @@ class TestHeapView(TestCase):
         s._hiding_tag_ = hv._hiding_tag_
         d = Der()
         d._hiding_tag_ = hv._hiding_tag_
-        self.root[0:50000] = 25000*[s, d]
+        self.root[:50000] = 25000*[s, d]
 
         start = clock()
 
@@ -233,7 +236,6 @@ class TestLeak(support.TestCase):
         support.TestCase.setUp(self)
         sets = self.guppy.sets
         heapdefs = getattr(sets.setsc, '_NyHeapDefs_'),
-        root = []
         heapyc = self.guppy.heapy.heapyc
         nodeset = sets.mutnodeset
         nodegraph = heapyc.NodeGraph
@@ -272,17 +274,16 @@ class TestLeak(support.TestCase):
         v = V()
         v.c = c
 
-        a = [x for x in [list]]
+        a = [list]
 
         li = [he, a, b, c, t, u, v, T, U, V, ns, nodeset, list]
         rcli0 = [grc(x) for x in li]
 
         ns |= li + list(range(10000, 10010))
-        root.extend(li)
-
+        root = list(li)
         rcli = [grc(x) for x in li]
 
-        rec = nodeset([x for x in li])
+        rec = nodeset(list(li))
         x = None
 
         rec.append(rec)
@@ -328,7 +329,6 @@ class TestLeak(support.TestCase):
         support.TestCase.setUp(self)
         sets = self.guppy.sets
         heapdefs = getattr(sets.setsc, '_NyHeapDefs_'),
-        root = []
         heapyc = self.guppy.heapy.heapyc
         nodeset = sets.NodeSet
         nodegraph = heapyc.NodeGraph
@@ -347,9 +347,7 @@ class TestLeak(support.TestCase):
         t = T()
         u = U()
 
-        root.append(t)
-        root.append(u)
-
+        root = [t, u]
         hv = heapyc.HeapView(root, heapdefs)
         x = hv.heap()
         assert t in x
@@ -374,8 +372,7 @@ class TestNodeGraph(TestCase):
         ng.add_edge(1, 2)
         # Test add_edges_n1
         ng.add_edges_n1([3, 4], 5)
-        lng = list(ng)
-        lng.sort()
+        lng = sorted(ng)
         assert lng == [(1, 2), (3, 5), (4, 5)]
         # Test as_flat_list
         fl = ng.as_flat_list()
@@ -384,12 +381,9 @@ class TestNodeGraph(TestCase):
         # Test copy
         cp = ng.copy()
         cp.add_edge(5, 6)
-        # Test __iter__ explicitly
-        lng1 = list(ng.__iter__())
-        lng1.sort()
+        lng1 = sorted(ng.__iter__())
         assert lng1 == lng
-        lcp = list(cp)
-        lcp.sort()
+        lcp = sorted(cp)
         assert lcp == [(1, 2), (3, 5), (4, 5), (5, 6)]
 
         # Test domain_covers
@@ -400,20 +394,17 @@ class TestNodeGraph(TestCase):
         rng = ng.domain_restricted([1, 3])
         # Test get_domain
         assert rng.get_domain() == self.nodeset([1, 3])
-        lrng = list(rng)
-        lrng.sort()
+        lrng = sorted(rng)
         assert lrng == [(1, 2), (3, 5)]
         # Test get_range
         assert rng.get_range() == self.nodeset([2, 5])
         # Test invert
         rng.invert()
-        lrng = list(rng)
-        lrng.sort()
+        lrng = sorted(rng)
         assert lrng == [(2, 1), (5, 3)]
         # Test inverted
         ing = ng.inverted()
-        ling = list(ing)
-        ling.sort()
+        ling = sorted(ing)
         assert ling == [(2, 1), (5, 3), (5, 4)]
         # Test relimg
         assert ing.relimg([2]) == self.nodeset([1])
@@ -426,21 +417,17 @@ class TestNodeGraph(TestCase):
         assert ing.relimg([2, 5, 3]) == self.nodeset([1, 3, 4, 7])
         assert uing.relimg([2, 5, 3]) == self.nodeset([1, 3, 4, 7, 9])
 
-        # Test __getitem__
-        tgts = list(uing[2])
-        tgts.sort()
+        tgts = sorted(uing[2])
         assert tgts == [1, 9]
         # Test __len__
         assert len(uing) == 6
         uing[2] = (2, 8)
-        # Test __setitem__
-        tgts = list(uing[2])
-        tgts.sort()
+        tgts = sorted(uing[2])
         assert tgts == [2, 8]
 
         # Test clear
         ng.clear()
-        assert list(ng) == []
+        assert not list(ng)
 
         # Test constructor with iterable
 
@@ -452,7 +439,7 @@ class TestNodeGraph(TestCase):
 
         ng = self.nodegraph(is_mapping=True)
         assert ng.is_mapping
-        assert list(ng) == []
+        assert not list(ng)
         ng.add_edge(1, 2)
         assert list(ng) == [(1, 2)]
         assert ng[1] == 2
@@ -483,13 +470,15 @@ class TestNodeGraph(TestCase):
         assert ng.is_sorted
 
     def test_inheritance(self):
+
+
+
         class T(self.heapyc.NodeGraph):
             __slots__ = 'x'
 
             def as_sorted_list(self):
-                a = list(self)
-                a.sort()
-                return a
+                return sorted(self)
+
 
         t = T()
         t.add_edge(1, 2)
@@ -504,13 +493,12 @@ class TestNodeGraph(TestCase):
         self.nodegraph = T
         self.test_constructor_and_methods()
 
-        # Test with a constructor with new argument
-        # and some more attributes
+
 
         class R(T):
             __slots__ = 'stop',
 
-            def __new__(self, stop):
+            def __new__(cls, stop):
                 r = T.__new__(R, is_mapping=1)
                 r.add_edges_n1(list(range(stop)), 0)
                 r.stop = stop
@@ -522,15 +510,14 @@ class TestNodeGraph(TestCase):
             def values(self):
                 return [self[k] for k in list(self.keys())]
 
+
         r = R(10)
         assert r.stop == 10
         assert r.is_mapping
-        lr = list(r)
-        lr.sort()
+        lr = sorted(r)
         assert lr[-2:] == [(8, 0), (9, 0)]
 
-        keys = list(r.keys())
-        keys.sort()
+        keys = sorted(r.keys())
         assert keys == list(range(10))
         values = list(r.values())
         assert values == [0]*10
@@ -542,8 +529,7 @@ class TestClassifiers(TestCase):
 
     def test_inrel(self):
         def str_inrel(c):
-            c = list(c)
-            c.sort()
+            c = sorted(c)
             return ', '.join(['(%s, %r)' % (x.kind, x.relator) for x in c])
 
         hv = self.hv

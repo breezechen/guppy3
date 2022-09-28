@@ -38,7 +38,7 @@ Compilation failure expected, but continuting anyways...''', file=sys.stderr)
     with open('guppy/_version.py', 'r') as versionfile:
         version = re.search(r'^__version__ = [\'"]([^\'"]*)[\'"]$',
                             versionfile.read(), re.M)
-        version = version.group(1)
+        version = version[1]
 
     setup(name="guppy3",
           version=version,

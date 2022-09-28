@@ -39,14 +39,13 @@ class Document:
             self.out.append(self.node_of_taci('symbol', s.tgtfullname))
 
     def _visit_gets(self, node, what):
-        self._visit_subjects(
-            getattr(self.get_arg_subject(node), 'get_%s' % what)())
+        self._visit_subjects(getattr(self.get_arg_subject(node), f'get_{what}')())
 
     def ap_text(self, text):
         self.out.append(self.node_of_taci('text', text, (), 0))
 
     def close(self, chktag=None, n=1, chk=None, get=False):
-        for i in range(n):
+        for _ in range(n):
             out, tag, arg = self.outstack.pop()
             node = self.node_of_taci(tag, arg, self.out)
             if not get:
@@ -59,7 +58,7 @@ class Document:
         return node
 
     def error(self, msg, context=None, **kwds):
-        msg = 'Document: ' + msg
+        msg = f'Document: {msg}'
         more = [('Macro call site.', ms[0]) for ms in self.macro_stack]
         more.reverse()
 
@@ -133,17 +132,14 @@ class Document:
         rest = self.expand_list(rest)
         if arg:
             arg = self.expand_arg(arg)
-        else:
-            if not (rest and rest[0].tag == 'symbol'):
-                if not optarg:
-                    self.error(
-                        'Argument on line or as next children expected.', node)
-            else:
-                arg = rest[0].arg.strip()
-                rest = rest[1:]
-        if rest and rest[0].tag == 'symbol':
-            if not optmore:
-                self.error('More arguments than expected.', rest[0])
+        elif rest and rest[0].tag == 'symbol':
+            arg = rest[0].arg.strip()
+            rest = rest[1:]
+        elif not optarg:
+            self.error(
+                'Argument on line or as next children expected.', node)
+        if rest and rest[0].tag == 'symbol' and not optmore:
+            self.error('More arguments than expected.', rest[0])
         return arg, rest
 
     def get_arg_subject(self, node):
@@ -282,7 +278,7 @@ class Document:
         self._visit_children(node)
         if self.document_title is None:
             self.open('document_title')
-            self.gen_text('GSL document %s' % self.document_name)
+            self.gen_text(f'GSL document {self.document_name}')
             self.close()
         self.close()
 
@@ -296,7 +292,7 @@ class Document:
         if not node.children:
             self.error('For loop without subelements.', node)
 
-        if not (node.children[0].tag == 'in'):
+        if node.children[0].tag != 'in':
             self.error("First subelement of for loop must be 'in'.",
                        node.children[0])
         inode = node.children[0]
@@ -343,7 +339,7 @@ class Document:
     def visit_label(self, node):
         subject = self.get_cur_subject(node)
         arg, rest = self.get_arg_rest(node)
-        name = subject.get_link_name() + '.label:'+arg
+        name = f'{subject.get_link_name()}.label:{arg}'
         self.open('define', name)
         self.close()
         for r in rest:
@@ -369,8 +365,7 @@ class Document:
         self._visit_gets(node, 'mappings')
 
     def visit_meta(self, node):
-        arg = node.arg.strip()
-        if arg:
+        if arg := node.arg.strip():
             colon = arg.find(':')
             if colon <= 0:
                 self.error('Argument to meta, if any,  must be of the form <name>:<content>.',
@@ -418,7 +413,7 @@ class Document:
         if tag == 'mykind':
             idn = subject.get_link_name()
             if name:
-                idn = idn + '.' + name
+                idn = f'{idn}.{name}'
                 text = name
             else:
                 text = idn.split('.')[-1]
@@ -426,7 +421,7 @@ class Document:
             idn = subject.get_link_name()
             idn = '.'.join(idn.split('.')[:2])
             if name:
-                idn = idn + '.' + name
+                idn = f'{idn}.{name}'
                 text = name
         else:
             self.error('Invalid tag: %r in reference.' % tag, node)
@@ -524,7 +519,7 @@ class Attributes:
         return self.as_[0].find_kind_aspects()
 
     def get_link_name(self):
-        return self.as_[0].mod.tgt_prefix+'(%s)' % ','.join([x.get_link_name() for x in self.as_])
+        return f"{self.as_[0].mod.tgt_prefix}({','.join([x.get_link_name() for x in self.as_])})"
 
     def get_name(self):
         return ', '.join([x.get_name() for x in self.as_])
@@ -580,7 +575,7 @@ class SubDoc(Document):
 
     def gen_anything(self):
         self.open('strong')
-        self.gen_text(' ' + self.anykind)
+        self.gen_text(f' {self.anykind}')
         self.close()
 
     def gen_argref(self, a):
@@ -648,28 +643,29 @@ class SubDoc(Document):
                 func(args)
 
         def gen_or(asp, sep,
-                   orparneed=False,   # Set to True if sequences needs parentheses between or
-                   sup=1
-                   ):
+                       orparneed=False,   # Set to True if sequences needs parentheses between or
+                       sup=1
+                       ):
 
-            if asp:
-                if len(asp) == 1:
-                    gen_arg(asp[0])
-                    return
-                gen_arg(asp[0], parneed=orparneed)
-                for ch in asp[1:]:
-                    if sup:
-                        self.open('sup')
-                        self.open('strong')
-                    if callable(sep):
-                        sep()
-                    else:
-                        self.gen_text(sep)
-                    if sup:
-                        self.close()
-                        self.close()
-                    clr_sycomma()
-                    gen_arg(ch, parneed=orparneed)
+            if not asp:
+                return
+            if len(asp) == 1:
+                gen_arg(asp[0])
+                return
+            gen_arg(asp[0], parneed=orparneed)
+            for ch in asp[1:]:
+                if sup:
+                    self.open('sup')
+                    self.open('strong')
+                if callable(sep):
+                    sep()
+                else:
+                    self.gen_text(sep)
+                if sup:
+                    self.close()
+                    self.close()
+                clr_sycomma()
+                gen_arg(ch, parneed=orparneed)
 
         def gen_arg(a, parneed=0):
             t = a.d_tag
@@ -722,6 +718,7 @@ class SubDoc(Document):
                 gen_taggy('1', args, ga)
             else:
                 ga(args)
+
         sycomma = []
         gen_args(args)
 
@@ -871,8 +868,7 @@ class SubDoc(Document):
                 self.gen_text(d.src.node.arg.strip())
                 self.close()
                 self.close()
-                ctx = d.find_aspects('in context')
-                if ctx:
+                if ctx := d.find_aspects('in context'):
                     self.open('dd')
                     self.open('dl')
                     for ct in ctx:
@@ -988,7 +984,7 @@ class SubDoc(Document):
         self.close('dd')
 
     def gen_def(self, a):
-        getattr(self, 'gen_%s_def' % a.d_tag)(a)
+        getattr(self, f'gen_{a.d_tag}_def')(a)
 
     def gen_delitem_def(self, op):
         self.open('dt')
@@ -1006,12 +1002,10 @@ class SubDoc(Document):
             self.gen_text('del ')
             self.close()
             self.close()
-            self.close()
         else:
             self.open('link_to', link_name)
             self.gen_text('del ')
-            self.close()
-
+        self.close()
         self.gen_self(op)
         args = op.get_arguments()
         self.gen_text('[')
@@ -1050,11 +1044,11 @@ class SubDoc(Document):
         for typ, li in tab:
             try:
                 try:
-                    gen_desc = getattr(self, 'gen_%s_descriptions' % typ)
+                    gen_desc = getattr(self, f'gen_{typ}_descriptions')
                 except AttributeError:
                     hd = typ
                     if (len(li) > 1):
-                        hd = hd + 's'
+                        hd = f'{hd}s'
                     hd = hd.capitalize().replace('_', ' ')
                     self.gen_outer_dt(hd)
                     for a in li:
@@ -1093,8 +1087,7 @@ class SubDoc(Document):
         for eg in egs:
             self.open('dd')
             self.open('pre')
-            ct = eg.get_ctx_text()
-            if ct:
+            if ct := eg.get_ctx_text():
                 if not ct.endswith('\n'):
                     ct += '\n'
                 self.gen_text(ct)
@@ -1106,50 +1099,6 @@ class SubDoc(Document):
             self.close()
             self.close()
             continue
-
-            self.open('dd')
-            self.open('code')
-            self.gen_text(eg.get_ex_text())
-            ct = eg.get_ctx_text()
-            self.close()
-
-            if ct:
-                self.open('em')
-                self.gen_text(' # in context:')
-                self.close()
-
-            self.close()
-            if ct:
-                if '\n' in ct:
-                    self.open('pre')
-                    self.gen_text(ct)
-                    self.close()
-                else:
-                    self.open('dd')
-                    self.open('code')
-                    self.gen_text(ct)
-                    self.close()
-                    self.close()
-
-                return
-
-                self.open('dd')
-                self.open('dl')
-                self.open('dt')
-                self.open('strong')
-                self.gen_text('In context')
-                self.close()
-                self.close()
-                self.open('dd')
-                if '\n' in ct:
-                    self.open('pre')
-                else:
-                    self.open('code')
-                self.gen_text(ct)
-                self.close()
-                self.close()
-                self.close()
-                self.close('dd')
 
     def gen_example_syn(self, eg):
         pass
@@ -1215,8 +1164,8 @@ class SubDoc(Document):
         self.gen_text(self.kindbrackets[0])
         self.open('dl')
         for a in ats:
+            self.open('dd')
             if a.d_tag in ('kind',) and not a.is_synthetic:
-                self.open('dd')
                 self.open('em')
                 self.gen_text('Subkind of: ')
                 self.close()
@@ -1224,16 +1173,11 @@ class SubDoc(Document):
                     self.gen_def(a)
                 else:
                     self.gen_ref(a)
-                self.close()
+            elif defi:
+                self.gen_def(a)
             else:
-                if defi:
-                    self.open('dd')
-                    self.gen_def(a)
-                    self.close()
-                else:
-                    self.open('dd')
-                    self.gen_ref(a)
-                    self.close()
+                self.gen_ref(a)
+            self.close()
         self.open('dd')
         self.gen_text(self.kindbrackets[1])
         self.close()
@@ -1378,7 +1322,7 @@ class SubDoc(Document):
                 self.open('strong')
                 hd = asp.capitalize()
                 if len(pres) > 1:
-                    hd = hd + 's'
+                    hd = f'{hd}s'
                 self.gen_text(hd)
                 self.close()
                 self.close()
@@ -1505,13 +1449,10 @@ class SubDoc(Document):
         if subdescript:
             self.open('define', link_name)
 
-        if subdescript:
-            self.close()
-        else:
+        if not subdescript:
             self.open('link_to', link_name)
             self.gen_text('# ')
-            self.close()
-
+        self.close()
         self.gen_self(op)
         self.gen_index(op)
         self.gen_returns(op, subdescript)
@@ -1645,7 +1586,7 @@ class SubDoc(Document):
 
     def gen_ref(self, k):
         t = k.d_tag
-        getattr(self, 'gen_%s_ref' % t)(k)
+        getattr(self, f'gen_{t}_ref')(k)
 
     def gen_returns(self, m, subdescript):
         if self.no_ret:
@@ -1708,13 +1649,12 @@ class SubDoc(Document):
         self.gen_returns(op, subdescript)
 
     def gen_self(self, op):
-        s = self.get_self_node(op)
-        if not s:
+        if s := self.get_self_node(op):
+            self.out.append(s)
+        else:
             self.open('em')
             self.gen_text('self')
             self.close()
-        else:
-            self.out.append(s)
 
     def gen_self_def(self, k):
         pass
@@ -1823,19 +1763,18 @@ class SubDoc(Document):
     def gen_synopsis(self, m):
         ats = m.find_aspects('*')
         ats = self.combine_attrs_of_same_kind(ats)
-        tab = self.sortup_aspects(ats, synopsis=1)
-        if tab:
+        if tab := self.sortup_aspects(ats, synopsis=1):
             self.gen_outer_dt('Synopsis')
             self.open('dd')
             self.open('dl')
             self.level += 1
             for typ, li in tab:
                 try:
-                    gen_syn = getattr(self, 'gen_%s_syn' % typ)
+                    gen_syn = getattr(self, f'gen_{typ}_syn')
                 except AttributeError:
                     name = typ.capitalize().replace('_', ' ')
                     if len(li) != 1:
-                        name = name+'s'
+                        name = f'{name}s'
                     self.gen_outer_dt(name)
                     for a in li:
                         self.open('dd')
@@ -1885,7 +1824,7 @@ class SubDoc(Document):
 
         otab = []
         for typ in order:
-            if not typ in tab:
+            if typ not in tab:
                 continue
             li = tab[typ]
             otab.append((typ, li))

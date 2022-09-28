@@ -5,9 +5,7 @@ class GsmlHandler:
         self.stack.append(self.out)
         self.out = []
         if attrs:
-            at = []
-            for k, v in attrs:
-                at.append(self.mod.node_of_taci(k, v))
+            at = [self.mod.node_of_taci(k, v) for k, v in attrs]
             self.out.append(self.mod.node_of_taci('with', '', at))
 
     def handle_endtag(self, tag):
@@ -18,7 +16,7 @@ class GsmlHandler:
     def handle_charref(self, name):
         if name[:1] == "x":
             char = int(name[1:], 16)
-            name = '0'+name
+            name = f'0{name}'
         else:
             char = int(name)
         if 0 <= char < 128:
@@ -61,6 +59,7 @@ class _GLUECLAMP_:
     encoding = "iso-8859-1"
 
     def node_of_gsml(self, text):
+
         class Parser(GsmlHandler, self.HTMLParser):
             def __init__(self, mod):
                 mod.HTMLParser.__init__(self)
@@ -73,8 +72,7 @@ class _GLUECLAMP_:
         p.close()
         if p.stack:
             raise SyntaxError('Missing end tag')
-        node = self.node_of_taci('block', '', p.out, 0)
-        return node
+        return self.node_of_taci('block', '', p.out, 0)
 
     def _test_main_(self):
         x = """

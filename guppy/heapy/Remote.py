@@ -378,12 +378,13 @@ interpreter heap under investigation rather than the current one.)
     def do_stat(self, arg):
         print("Target overview", file=self.stdout)
         print("------------------------------------", file=self.stdout)
-        print("target.sys.executable   = %s" %
-              self.target.sys.executable, file=self.stdout)
-        print("target.sys.argv         = %s" %
-              self.target.sys.argv, file=self.stdout)
-        print("target.wd               = %s" %
-              self.target.wd, file=self.stdout)
+        print(
+            f"target.sys.executable   = {self.target.sys.executable}",
+            file=self.stdout,
+        )
+
+        print(f"target.sys.argv         = {self.target.sys.argv}", file=self.stdout)
+        print(f"target.wd               = {self.target.wd}", file=self.stdout)
         print("target.pid              = %d" %
               self.target.pid, file=self.stdout)
         print("------------------------------------", file=self.stdout)

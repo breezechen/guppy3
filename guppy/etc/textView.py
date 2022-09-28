@@ -53,8 +53,11 @@ class TextViewer(Toplevel):
         try:
             textFile = open(fileName, 'r')
         except IOError:
-            tkinter.messagebox.showerror(title='File Load Error',
-                                         message='Unable to load file '+repr(fileName)+' .')
+            tkinter.messagebox.showerror(
+                title='File Load Error',
+                message=f'Unable to load file {repr(fileName)} .',
+            )
+
         else:
             self.textView.insert(0.0, textFile.read())
 

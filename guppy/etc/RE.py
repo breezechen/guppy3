@@ -28,8 +28,7 @@ class WordsMemo:
         #  ...]
         xsu = []
         for i in range(N+1):
-            xs = self.get_words_of_length(i)
-            if xs:
+            if xs := self.get_words_of_length(i):
                 xsu.append((i, xs))
         return xsu
 
@@ -62,56 +61,43 @@ class RE(REBASE):
 
     _re_special = r'.^$*+?{}\[]|()'
 
-    def __add__(a, b):
-        if isinstance(b, RE):
-            return concat(a, b)
-        else:
-            return Concatenation(a, Single(b))
+    def __add__(self, b):
+        return concat(self, b) if isinstance(b, RE) else Concatenation(self, Single(b))
 
-    def __call__(a, *args, **kwds):
+    def __call__(self, *args, **kwds):
         if not kwds:
             if args == ('*',):
-                return KleeneClosure(a)
+                return KleeneClosure(self)
             elif args == ('+',):
-                return PositiveClosure(a)
+                return PositiveClosure(self)
             elif args == ('?',):
-                return EpsilonOrOne(a)
+                return EpsilonOrOne(self)
         raise ValueError(
             "Argument to regular expression must be '*' or '+' or '?'")
 
     def __hash__(self):
         return hash((self._name, tuple(self)))
 
-    def __eq__(a, b):
-        return (a._name == b._name and
-                tuple(a) == tuple(b))
+    def __eq__(self, b):
+        return self._name == b._name and tuple(self) == tuple(b)
 
-    def __lt__(a, b):
-        if a._name == b._name:
-            return tuple(a) < tuple(b)
+    def __lt__(self, b):
+        if self._name == b._name:
+            return tuple(self) < tuple(b)
         else:
-            return a._name < b._name
+            return self._name < b._name
 
-    def __or__(a, b):
-        return Union(a, b)
+    def __or__(self, b):
+        return Union(self, b)
 
     def get_num_closures(self):
-        ns = 0
-        for ch in self:
-            ns += ch.get_num_closures()
-        return ns
+        return sum(ch.get_num_closures() for ch in self)
 
     def get_num_syms(self):
-        ns = 0
-        for ch in self:
-            ns += ch.get_num_syms()
-        return ns
+        return sum(ch.get_num_syms() for ch in self)
 
     def get_sum_sym_lengths(self):
-        ns = 0
-        for ch in self:
-            ns += ch.get_sum_sym_lengths()
-        return ns
+        return sum(ch.get_sum_sym_lengths() for ch in self)
 
     def get_words_memo(self):
         ch = [x.get_words_memo() for x in self]
@@ -169,9 +155,8 @@ class RE(REBASE):
 
     def simulform(self):
         def f(x):
-            if x == '':
-                return '()'
-            return str(x)
+            return '()' if x == '' else str(x)
+
         return self.mappedrepr(f)
 
 
@@ -192,13 +177,11 @@ class Seq(RE):
     _priority = 0
     _name = 'Seq'
 
-    def __new__(clas, *symbols):
-        if not symbols:
-            return Epsilon
-        return REBASE.__new__(clas, symbols)
+    def __new__(cls, *symbols):
+        return REBASE.__new__(cls, symbols) if symbols else Epsilon
 
     def __repr__(self):
-        return '%s(%s)' % (self.__class__.__name__, ', '.join(['%r' % (x,) for x in self]))
+        return f"{self.__class__.__name__}({', '.join(['%r' % (x, ) for x in self])})"
 
     def apseq(self, ap):
         ap(self)
@@ -214,27 +197,19 @@ class Seq(RE):
         return len(self)
 
     def get_sum_sym_lengths(self):
-        s = 0
-        for x in self:
-            s += len(str(x))
-        return s
+        return sum(len(str(x)) for x in self)
 
     def get_words_memo(self):
         return WordsMemo(self, ())
 
     def get_words_of_length_memoized(self, N, memo):
-        if N == len(self):
-            return [self]
-        else:
-            return []
+        return [self] if N == len(self) else []
 
     def limited(self, N):
         return self
 
     def mappedrepr(self, f):
-        if not self:
-            return f('')
-        return ' '.join(['%s' % (f(x),) for x in self])
+        return ' '.join([f'{f(x)}' for x in self]) if self else f('')
 
     def reversed(self):
         r = list(self)
@@ -255,9 +230,7 @@ Epsilon = REBASE.__new__(Seq, ())
 def concat(*args):
     args = [x for x in args if x is not Epsilon]
     if len(args) < 2:
-        if not args:
-            return Epsilon
-        return args[0]
+        return args[0] if args else Epsilon
     return REBASE.__new__(Concatenation, args)
 
 
@@ -265,19 +238,17 @@ class Concatenation(RE):
     _priority = 2
     _name = 'Concat'
 
-    def __new__(clas, *args):
+    def __new__(cls, *args):
         if len(args) < 2:
-            if not args:
-                return Epsilon
-            return args[0]
-        return REBASE.__new__(clas, args)
+            return args[0] if args else Epsilon
+        return REBASE.__new__(cls, args)
 
     def __repr__(self):
         rs = []
         for ch in self:
             r = '%r' % (ch,)
             if ch._priority > self._priority:
-                r = '(%s)' % (r,)
+                r = f'({r})'
             rs.append(r)
         return ' + '.join(rs)
 
@@ -287,9 +258,7 @@ class Concatenation(RE):
         while 1:
             xs = []
             for (i, us) in enumerate(uns):
-                for x in us[ixs[i]]:
-                    if x is not Epsilon:
-                        xs.append(x)
+                xs.extend(x for x in us[ixs[i]] if x is not Epsilon)
             ap(Seq(*xs))
             j = 0
             for j, ix in enumerate(ixs):
@@ -337,7 +306,7 @@ class Concatenation(RE):
         for ch in self:
             r = ch.mappedrepr(f)
             if ch._priority > self._priority:
-                r = '(%s)' % (r,)
+                r = f'({r})'
             rs.append(r)
         return ' '.join(rs)
 
@@ -350,8 +319,7 @@ class Concatenation(RE):
         conc = [x.simplified(*a, **k) for x in self]
         sa = []
         for c in conc:
-            for a in c.seqatoms():
-                sa.append(a)
+            sa.extend(iter(c.seqatoms()))
         return simple_Concatenation(sa)
 
     def unionsplitted(self):
@@ -410,8 +378,7 @@ def conclosure(conc):
                   w0[0] == w):
                 w = PositiveClosure(w)
             else:
-                if w0 is not None:
-                    nconc.append(w0)
+                nconc.append(w0)
         w0 = w
     if w0 is not None:
         nconc.append(w0)
@@ -432,9 +399,7 @@ def simple_Concatenation(conc):
             nconc.append(e)
             continue
         j = i
-        while j < len(conc):
-            if not isinstance(conc[j], Seq):
-                break
+        while j < len(conc) and isinstance(conc[j], Seq):
             j += 1
         if j == i + 1:
             nconc.append(e)
@@ -478,10 +443,7 @@ def simpleunion(lines):
             olines = r.get_uncommons()
             u = simpleunion(olines)
             if u is not Epsilon:
-                if r.dir == -1:
-                    conc = [u]+conc
-                else:
-                    conc = conc + [u]
+                conc = [u]+conc if r.dir == -1 else conc + [u]
             if conc:
                 us.append(conc)
             else:
@@ -498,11 +460,7 @@ def simpleunion(lines):
     else:
         u = None
     if have_epsilon:
-        if u is not None:
-            u = simple_EpsilonOrOne(u)
-        else:
-            u = Epsilon
-
+        u = simple_EpsilonOrOne(u) if u is not None else Epsilon
     return u
 
 
@@ -510,15 +468,15 @@ class Union(RE):
     _priority = 3
     _name = 'Union'
 
-    def __new__(clas, *args):
-        return REBASE.__new__(clas, args)
+    def __new__(cls, *args):
+        return REBASE.__new__(cls, args)
 
     def __repr__(self):
         rs = []
         for ch in self:
             r = '%r' % (ch,)
             if ch._priority > self._priority:
-                r = '(%s)' % r
+                r = f'({r})'
             rs.append(r)
         return ' | '.join(rs)
 
@@ -542,17 +500,17 @@ class Union(RE):
 
     def limited(self, N):
         uni = [x.limited(N) for x in self]
-        for i, x in enumerate(uni):
-            if x is not self[i]:
-                return self.__class__(*uni)
-        return self
+        return next(
+            (self.__class__(*uni) for i, x in enumerate(uni) if x is not self[i]),
+            self,
+        )
 
     def mappedrepr(self, f):
         rs = []
         for ch in self:
-            r = '%s' % (ch.mappedrepr(f),)
+            r = f'{ch.mappedrepr(f)}'
             if ch._priority > self._priority:
-                r = '(%s)' % r
+                r = f'({r})'
             rs.append(r)
         return ' | '.join(rs)
 
@@ -582,14 +540,14 @@ class SimplifiedUnion(Union):
 class Called(RE):
     _priority = 1
 
-    def __new__(clas, arg):
-        return REBASE.__new__(clas, (arg,))
+    def __new__(cls, arg):
+        return REBASE.__new__(cls, (arg,))
 
     def __repr__(self):
         ch = self[0]
         r = '%r' % (ch,)
         if ch._priority > self._priority:
-            r = '(%s)' % r
+            r = f'({r})'
         return "%s(%r)" % (r, self._name)
 
     def apseqatoms(self, ap):
@@ -603,8 +561,8 @@ class Called(RE):
         r = ch.mappedrepr(f)
         if (ch._priority > self._priority
                 or isinstance(ch, Seq) and len(ch) > 1):
-            r = '(%s)' % r
-        return "%s%s" % (r, self._name)
+            r = f'({r})'
+        return f"{r}{self._name}"
 
     def simplified(self, *a, **k):
         return self.__class__(self[0].simplified(*a, **k))
@@ -660,9 +618,7 @@ class KleeneClosure(Closure):
 
 def simple_KleeneClosure(x):
     # (b+)* -> b*
-    if x._name == '+':
-        return simple_KleeneClosure(x[0])
-    return KleeneClosure(x)
+    return simple_KleeneClosure(x[0]) if x._name == '+' else KleeneClosure(x)
 
 
 class PositiveClosure(Closure):
@@ -695,9 +651,7 @@ class EpsilonOrOne(Called):
         self[0].apseq(ap)
 
     def get_words_of_length_memoized(self, N, memo):
-        if N == 0:
-            return [Epsilon]
-        return memo.ch[0].get_words_of_length(N)
+        return [Epsilon] if N == 0 else memo.ch[0].get_words_of_length(N)
 
     def limited(self, N):
         x = self[0].limited(N)
@@ -719,10 +673,7 @@ def simple_EpsilonOrOne(x):
         return simple_KleeneClosure(x)
 
     # (a*)? -> a*
-    if x._name == '*':
-        return x
-
-    return EpsilonOrOne(x)
+    return x if x._name == '*' else EpsilonOrOne(x)
 
 
 class RegularSystem:
@@ -745,7 +696,7 @@ class RegularSystem:
         def transname(trans):
             name = trans.simulform()
             if trans._priority > 1:
-                name = '(%s)' % (name,)
+                name = f'({name})'
             return name
 
         self.setup_names()
@@ -762,7 +713,7 @@ class RegularSystem:
             es = []
             for Xj in xs:
                 if Xj in Tk:
-                    es.append('%s %s' % (transname(Tk[Xj]), statename(Xj)))
+                    es.append(f'{transname(Tk[Xj])} {statename(Xj)}')
             if es:
                 print(' | '.join(es))
             else:
@@ -862,9 +813,7 @@ class RegularSystem:
             self.order
         except AttributeError:
             self.setup_order()
-        self.names = {}
-        self.names[self.Start] = 'X0'
-
+        self.names = {self.Start: 'X0'}
         for i, s in enumerate(self.order):
             self.names[s] = 'X%d' % (i+1)
         self.names[self.Final] = 'Final'

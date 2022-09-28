@@ -7,15 +7,14 @@ def str_as_atr(s):
         v = s[i]
         if i + 1 < len(s) and s[i+1].isdigit():
             n = 0
-            i = i + 1
+            i += 1
             while i < len(s) and s[i].isdigit():
                 n = n * 10 + int(s[i])
                 i += 1
         else:
             i += 1
             n = 1
-        for j in range(n):
-            atr.append(v)
+        atr.extend(v for _ in range(n))
     return atr
 
 
@@ -31,8 +30,7 @@ def atr_as_str(atr):
         while j < len(prestr) and prestr[j] == c:
             j += 1
         if j - i > 2:
-            prefl.append(c)
-            prefl.append(str(j-i))
+            prefl.extend((c, str(j-i)))
         else:
             while i < j:
                 prefl.append(c)
@@ -65,7 +63,7 @@ class Paths:
             row = row.parent
 
         if isinstance(andsets, dict):
-            self.andsetbyname.update(andsets)
+            self.andsetbyname |= andsets
         elif isinstance(andsets, (tuple, list)):
             row = self.srcrow
             for i, s in enumerate(andsets):
@@ -100,8 +98,11 @@ class Paths:
                 a = via
             a = ' '*indent + a
             name = row.ixlstr
-            a = a + ' ' + ' '*(8+srcrow.depth*indinc -
-                               len(name)-len(a)) + name + ': '
+            a = (
+                (f'{a} ' + ' ' * (8 + srcrow.depth * indinc - len(name) - len(a)))
+                + name
+            ) + ': '
+
             yield a+row.getsummary(mod.line_length-len(a))
             row = row.parent
             indent += indinc
@@ -110,7 +111,7 @@ class Paths:
         return 'Paths from source %r to target %r.' % (self.srcrow.ixlstr, '_')
 
     def _oh_get_line_iter(self):
-        return getattr(self, 'get_line_iter_%s' % (self.variant,))()
+        return getattr(self, f'get_line_iter_{self.variant}')()
 
     def _oh_get_more_state_msg(self, startindex, lastindex):
         return ''
@@ -136,12 +137,7 @@ class Paths:
                     strsing = self.get_str_of_path_component_singleton(set)
                 else:
                     strsing = ''
-                vline = '%s %s %s %s' % (
-                    key,
-                    ' '*(40-len(key) - len(sidx)),
-                    sidx,
-                    strsing
-                )
+                vline = f"{key} {' ' * (40 - len(key) - len(sidx))} {sidx} {strsing}"
 
                 yield vline
 
@@ -155,15 +151,11 @@ class Paths:
                         for rel in rels:
                             if rel is mod.Path.identity:
                                 continue
-                            if rel is mod.Path.norelation:
-                                k = '??'
-                            else:
-                                k = str(rel) % ''
+                            k = '??' if rel is mod.Path.norelation else str(rel) % ''
                             k = ' '*(indent+indinc)+k
                             yield k, i, p
 
-                for line in genlines(par, get_nks(key, set), indent+indinc):
-                    yield line
+                yield from genlines(par, get_nks(key, set), indent+indinc)
 
         def get_ks():
             for i, s in enumerate(srcset.byid.parts):
@@ -171,8 +163,7 @@ class Paths:
                 k = k + (' -'*20)[:36-len(k)-srcrow.depth]
                 yield k, i, s
 
-        for line in genlines(srcrow, get_ks()):
-            yield line
+        yield from genlines(srcrow, get_ks())
         return
 
     def get_line_iter_2(self):
@@ -210,10 +201,9 @@ class Paths:
             idxs = '[%d]' % idx
             if indir < 0:
                 indent = (row.depth)*indinc
-                sidx = '%s%s%s' % (
-                    sidx, ' '*(6+indent-len(sidx)-len(idxs)), idxs)
+                sidx = f"{sidx}{' ' * (6 + indent - len(sidx) - len(idxs))}{idxs}"
                 if row.parent is None:
-                    sidx += ' == %s' % part.brief
+                    sidx += f' == {part.brief}'
 
             else:
                 #idxs = ('[%.'+str(max_str_len_set)+'d]')%idx
@@ -222,11 +212,7 @@ class Paths:
                                         max_ixlstr_len-len(sidx)-len(idxs)),
                                    idxs)
                 sidx += ' ' * (srcrow.depth + 1 - row.depth)
-                if row.parent is not None:
-                    sidx += '@'
-                else:
-                    sidx += '= %s' % part.brief
-
+                sidx += '@' if row.parent is not None else f'= {part.brief}'
             if row.parent is None:
                 #vline += ' == %s'%self.get_str_of_path_component_singleton(part)
                 vline = '%2s: %s' % (lno[0], sidx)
@@ -245,10 +231,7 @@ class Paths:
                 for rel in rels:
                     if rel is mod.Path.identity:
                         continue
-                    if rel is mod.Path.norelation:
-                        k = '??'
-                    else:
-                        k = str(rel) % ''
+                    k = '??' if rel is mod.Path.norelation else str(rel) % ''
                     relstrings.append(k)
 
                 relsstr = ' / '.join(relstrings)
@@ -257,15 +240,13 @@ class Paths:
                 lno[0] += 1
                 if seenlno is not None:
                     relsstr += ' -> #%d' % seenlno
-                    yield ('STOP_AFTER', vline + ' ' + relsstr)
+                    yield ('STOP_AFTER', f'{vline} {relsstr}')
                 else:
-                    yield vline + ' ' + relsstr
-                    for line in genlines(row.parent, p, i):
-                        yield line
+                    yield f'{vline} {relsstr}'
+                    yield from genlines(row.parent, p, i)
 
         for i, p in enumerate((srcrow.set & self.andsetbyname[srcrow.ixlstr]).byid.parts):
-            for line in genlines(srcrow, p, i):
-                yield line
+            yield from genlines(srcrow, p, i)
 
 
 class RefPatIter:
@@ -296,11 +277,7 @@ class RefPatRow:
         self.seenline = seenline
         self.ixl = ixl[:]
         self.parent = parent
-        if parent is not None:
-            self.depth = parent.depth + 1
-        else:
-            self.depth = 0
-
+        self.depth = parent.depth + 1 if parent is not None else 0
         self.index = 0
         self.maxdepth = rp.depth
         self.max_str_len = rp.mod.line_length
@@ -311,16 +288,12 @@ class RefPatRow:
     def __str__(self):
         prestr = '%2d: %s ' % (self.index, self.ixlstr)
 
-        if self.index & 1:
-            fillpat = ' ' * 100
-        else:
-            fillpat = '-'*100
-
+        fillpat = ' ' * 100 if self.index & 1 else '-'*100
         lps = len(prestr)
         fill = fillpat[lps:9+self.depth]
 
         if self.seenline:
-            ref = '[^ %s]' % self.seenline.index
+            ref = f'[^ {self.seenline.index}]'
         elif self.isroot:
             ref = '[R]'
         elif self.depth > 0 and self.set <= self.rp.stopkind:
@@ -330,8 +303,8 @@ class RefPatRow:
         else:
             ref = '[+]'
 
-        prefix = '%s%s %s ' % (prestr, fill, ref)
-        return '%s%s' % (prefix, self.getsummary(self.max_str_len-len(prefix)))
+        prefix = f'{prestr}{fill} {ref} '
+        return f'{prefix}{self.getsummary(self.max_str_len - len(prefix))}'
 
     def getchild(self, ix):
         while ix >= len(self.children) and not self.isready:
@@ -340,8 +313,7 @@ class RefPatRow:
 
     def getsummary(self, max_len):
         kind, set = self.kind, self.set
-        summary = set.fam.get_str_refpat(set, kind, max_len)
-        return summary
+        return set.fam.get_str_refpat(set, kind, max_len)
 
 
 class ReferencePattern:
@@ -403,14 +375,14 @@ Methods
         return len(self.lines)
 
     def _oh_get_label(self):
-        return 'Reference Pattern by <' + self.er.classifier.get_byname() + '>.'
+        return f'Reference Pattern by <{self.er.classifier.get_byname()}>.'
 
     def _oh_get_more_state_msg(self, startindex, lastindex):
-        if self.isfullygenerated:
-            msg = '%d more lines. ' % (len(self.lines) - 1-lastindex,)
-        else:
-            msg = ''
-        return msg
+        return (
+            '%d more lines. ' % (len(self.lines) - 1 - lastindex,)
+            if self.isfullygenerated
+            else ''
+        )
 
     def _oh_get_line_iter(self):
         it = self.iterlines(0)
@@ -477,8 +449,7 @@ Methods
                 (depth == 0 or not (set <= self.stopkind))):
             for i, cs in enumerate(children):
                 ixl.append(i)
-                for rl in self.linegenerator(cs, ixl, line):
-                    yield rl
+                yield from self.linegenerator(cs, ixl, line)
                 ixl.pop()
         line.isready = 1
 
@@ -493,8 +464,7 @@ Methods
                 for row in self.get_partition(chset, self.er).get_rows()]
 
     def get_partition(self, set, er):
-        p = self.mod.Part.partition(set, er)
-        return p
+        return self.mod.Part.partition(set, er)
 
     def paths(self, key, **kwds):
         return Paths(self.mod, self, key, **kwds)

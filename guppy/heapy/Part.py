@@ -59,7 +59,7 @@ class Format(object):
         return "<%d more rows. Type e.g. '_.more' to view.>" % nummore
 
     def _oh_get_line_iter(self):
-        for numrows, row in enumerate(self.impl.get_rows()):
+        for row in self.impl.get_rows():
             yield self.get_formatted_row(row)
 
 
@@ -68,10 +68,7 @@ class SetFormat(Format):
 
     def get_label(self):
         impl = self.impl
-        if impl.count != 1:
-            s = 's'
-        else:
-            s = ''
+        s = 's' if impl.count != 1 else ''
         return 'Partition of a set of %d object%s. Total size = %d bytes.' % (
             impl.count, s, impl.size)
 
@@ -85,13 +82,15 @@ class SetFormat(Format):
     def get_stat_data(self, row):
         format = '%6d %6d %3d %8d %3d %9d %3d '
         impl = self.impl
-        fr = format % (
+        return format % (
             row.index,
-            row.count, int('%.0f' % (row.count * 100.0/impl.count)),
-            row.size, int('%.0f' % (row.size * 100.0/impl.size)),
-            row.cumulsize, int('%.0f' % (row.cumulsize * 100.0/impl.size)),
+            row.count,
+            int('%.0f' % (row.count * 100.0 / impl.count)),
+            row.size,
+            int('%.0f' % (row.size * 100.0 / impl.size)),
+            row.cumulsize,
+            int('%.0f' % (row.cumulsize * 100.0 / impl.size)),
         )
-        return fr
 
     def load_statrow(self, r):
         return self.load_statrow_csk(r)
@@ -102,14 +101,10 @@ class IdFormat(Format):
 
     def get_label(self):
         impl = self.impl
-        if impl.count != 1:
-            s = 's'
-        else:
-            s = ''
+        s = 's' if impl.count != 1 else ''
         return (
             'Set of %d %s object%s. Total size = %d bytes.' % (
                 impl.count, impl.kindname, s, impl.size))
-        return part
 
     def get_rowdata(self, row):
         return '%d %s' % (row.size, row.name)
@@ -121,12 +116,13 @@ class IdFormat(Format):
     def get_stat_data(self, row):
         impl = self.impl
         format = '%6d %8d %5.1f %9d %5.1f '
-        fr = format % (
+        return format % (
             row.index,
-            row.size, (row.size * 100.0/impl.size),
-            row.cumulsize, row.cumulsize * 100.0/impl.size,
+            row.size,
+            (row.size * 100.0 / impl.size),
+            row.cumulsize,
+            row.cumulsize * 100.0 / impl.size,
         )
-        return fr
 
     def load_statrow(self, r):
         return self.load_statrow_sk(r)
@@ -164,14 +160,13 @@ class DiffFormat(Format):
     def get_stat_data(self, row):
         impl = self.impl
         format = '%6d %6d %8d %9d %s '
-        fr = format % (
+        return format % (
             row.index,
             row.count,
             row.size,
             row.cumulsize,
             self._percent_of_b(row.cumulsize),
         )
-        return fr
 
     def load_statrow(self, r):
         return self.load_statrow_csk(r)
@@ -254,19 +249,18 @@ class Stat:
 
         trows = [
             '.loader: _load_stat',
-            '.format: %s' % self.format_name,
+            f'.format: {self.format_name}',
             '.timemade: %f' % self.timemade,
             '.count: %d' % count,
             '.size: %d' % size,
-            '.kindheader: %s' % self.kindheader,
-            '.kindname: %s' % self.kindname,
+            f'.kindheader: {self.kindheader}',
+            f'.kindname: {self.kindname}',
             '.numrows: %d' % len(rows),
         ]
+
         if getattr(self, 'b_count', None) is not None:
-            trows.append('.b_count: %d' % self.b_count)
-            trows.append('.b_size: %d' % self.b_size)
-        for r in rows:
-            trows.append('.r: %s' % self.format.get_rowdata(r))
+            trows.extend(('.b_count: %d' % self.b_count, '.b_size: %d' % self.b_size))
+        trows.extend(f'.r: {self.format.get_rowdata(r)}' for r in rows)
         return self.mod.load(trows)
 
     def __len__(self):
@@ -283,15 +277,13 @@ class Stat:
         otab = {}
         stab = {}
         for r in other.get_rows():
-            o = otab.get(r.name)
-            if o:
+            if o := otab.get(r.name):
                 otab[r.name] = StatRow(
                     r.count+o.count, r.size+o.size, r.name, o.index,  None)
             else:
                 otab[r.name] = r
         for r in self.get_rows():
-            o = otab.get(r.name)
-            if o:
+            if o := otab.get(r.name):
                 del otab[r.name]
                 count = r.count - o.count
                 size = r.size - o.size
@@ -300,8 +292,7 @@ class Stat:
                 size = r.size
             if count == 0 and size == 0:
                 continue
-            sr = stab.get(r.name)
-            if sr:
+            if sr := stab.get(r.name):
                 sr.count += count
                 sr.size += size
             else:
@@ -329,22 +320,19 @@ class Stat:
             '.b_size: %d' % other.size,
             '.count: %d' % cumulcount,
             '.size: %d' % cumulsize,
-            '.kindheader: %s' % self.kindheader,
-            '.kindname: %s' % self.kindname,
+            f'.kindheader: {self.kindheader}',
+            f'.kindname: {self.kindname}',
             '.numrows: %d' % len(rows),
         ]
-        for r in rows:
-            trows.append('.r: %d %d %s' % (r.count, r.size, r.name))
+
+        trows.extend('.r: %d %d %s' % (r.count, r.size, r.name) for r in rows)
         return self.mod.load(trows)
 
     def dump(self, fn, mode='a'):
-        if not hasattr(fn, 'write'):
-            f = open(fn, mode)
-        else:
-            f = fn
+        f = fn if hasattr(fn, 'write') else open(fn, mode)
         try:
             for r in self.get_trows():
-                if not r[-1:] == '\n':
+                if r[-1:] != '\n':
                     r += '\n'
                 f.write(r)
             end = '.end: .loader: %s\n' % self.loader
@@ -380,14 +368,9 @@ class Stat:
             idx += 1
 
     def get_rows_of_kinds(self, kinds):
-        # Return the rows with names in sequence kinds of unique names
-        # in that order. None if no such kind.
-
-        kindtab = {}
         N = len(kinds)
         res = [None] * len(kinds)
-        for i, kind in enumerate(kinds):
-            kindtab[kind] = i
+        kindtab = {kind: i for i, kind in enumerate(kinds)}
         assert len(kindtab) == N
 
         n = 0
@@ -527,15 +510,15 @@ class Partition:
 
     def get_trows(self):
         yield '.loader: _load_stat'
-        yield '.format: %s' % self.format.__class__.__name__
+        yield f'.format: {self.format.__class__.__name__}'
         yield '.timemade: %f' % self.timemade
         yield '.count: %d' % self.count
         yield '.size: %d' % self.size
-        yield '.kindname: %s' % self.kindname
-        yield '.kindheader: %s' % self.kindheader
+        yield f'.kindname: {self.kindname}'
+        yield f'.kindheader: {self.kindheader}'
         yield '.numrows: %d' % self.numrows
         for row in self.get_rows():
-            yield '.r: %s' % self.format.get_rowdata(row)
+            yield f'.r: {self.format.get_rowdata(row)}'
 
     def init_format(self, FormatClass):
         self.format = FormatClass(self)
@@ -623,10 +606,7 @@ class IdentityPartition(Partition):
             if start != clu.locount or stop < clu.hicount or step != 1:
                 if not clu.issorted:
                     sortrender = self.sortrender
-                    if sortrender == 'IDENTITY':
-                        ks = objects
-                    else:
-                        ks = [sortrender(x) for x in objects]
+                    ks = objects if sortrender == 'IDENTITY' else [sortrender(x) for x in objects]
                     ks = [(kind, i) for i, kind in enumerate(ks)]
                     ks.sort()
                     clu.objects = objects = self.mod.observation_list(
@@ -652,16 +632,21 @@ class IdentityPartition(Partition):
         if not ns:
             raise IndexError('Partition index out of range.')
         vi = self.mod.idset(ns, er=self.er)
-        row = PartRow(1, clu.obsize, self.render(vi.theone),
-                      rowidx, (rowidx+1-clu.locount)*clu.obsize + clu.losize,
-                      vi, vi.kind)
-        return row
+        return PartRow(
+            1,
+            clu.obsize,
+            self.render(vi.theone),
+            rowidx,
+            (rowidx + 1 - clu.locount) * clu.obsize + clu.losize,
+            vi,
+            vi.kind,
+        )
 
     def get_rowset(self, rowidx):
-        ns = self.get_nodeset(rowidx, rowidx+1, 1)
-        if not ns:
+        if ns := self.get_nodeset(rowidx, rowidx + 1, 1):
+            return self.mod.idset(ns, er=self.er)
+        else:
             raise IndexError('Partition index out of range.')
-        return self.mod.idset(ns, er=self.er)
 
 
 class SetPartition(Partition):

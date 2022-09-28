@@ -72,7 +72,7 @@ class GenGuppyDoc:
 
             for item, outhtml in [
                     ('about', None), ('help', 'ProfileBrowser.html')]:
-                input_file = join(self.input_dir, item + '_Prof.gsl')
+                input_file = join(self.input_dir, f'{item}_Prof.gsl')
                 node = self.gsl.SpecNodes.node_of_file(input_file)
 
                 t = self.gsl.Text.RecordingInter()
@@ -80,7 +80,7 @@ class GenGuppyDoc:
                 t.prepare_for_pickle()
 
                 import pickle
-                f.write('{} = {}\n'.format(item, repr(pickle.dumps(t))))
+                f.write(f'{item} = {repr(pickle.dumps(t))}\n')
 
                 if outhtml:
                     wrapped = self.gsl.SpecNodes.node_of_tatci(

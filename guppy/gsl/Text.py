@@ -70,7 +70,7 @@ class Node2Inter:
         for k, v in attrs:
             k = k.strip()
             v = v.strip()
-            setattr(self.out, '_gsl_%s' % k, v)
+            setattr(self.out, f'_gsl_{k}', v)
         node.accept(self)
         self.span_end()
 
@@ -126,7 +126,7 @@ class Node2Inter:
 
     def set_default_tag(self):
         if self.span_stack:
-            tag = 't%s' % self.mod._root.pickle.dumps(self.span_stack[-1])
+            tag = f't{self.mod._root.pickle.dumps(self.span_stack[-1])}'
         else:
             tag = 'tag'
         self.tag = tag
@@ -338,7 +338,7 @@ class Node2Inter:
         char = {'disc': '*', 'circle': 'O', 'square': '[]'}[mode]
 
         self.span_begin()
-        self.text('%s ' % char)
+        self.text(f'{char} ')
         self.span_end()
         self.span_begin(
             lmargin1=indent,
@@ -383,7 +383,6 @@ class Node2Inter:
 
     def visit_table(self, node):
         Table(self, node)
-        pass
 
     def visit_td(self, node):
         pass
@@ -561,9 +560,8 @@ class SimulText:
                 w = self.text_width(pre + space + word)
                 if w > self.width:
                     break
-                else:
-                    pre.extend(space + word)
-                    i += 1
+                pre.extend(space + word)
+                i += 1
             self.lines.append(pre)
 
     def wrap_lines(self):
@@ -588,31 +586,24 @@ class TableCell:
 
     def align(self, pos, width):
         align = self.attrs['align']
-        if align == 'center':
+        if align in ['center', 'justify']:
             self.tabstop = (pos + 0.5*width, 'center')
-        elif align == 'left':
-            self.tabstop = (pos, 'left')
-        elif align == 'right':
-            self.tabstop = (pos+width, 'right')
         elif align == 'char':
             w = self.out.width_to(self.attrs['char'])
             co = float(self.attrs['charoff'].rstrip('%'))/100.0
             self.tabstop = (pos + co*width-w, 'left')
-        elif align == 'justify':
-            # XXX I don't know how this works
-            self.tabstop = (pos + 0.5*width, 'center')
+        elif align == 'left':
+            self.tabstop = (pos, 'left')
+        elif align == 'right':
+            self.tabstop = (pos+width, 'right')
         else:
-            raise ValueError('Invalid align: %s' % align)
+            raise ValueError(f'Invalid align: {align}')
 
     def get_edges(self, width):
         align = self.attrs['align']
         mywidth = self.width
         if align == 'center':
             l, r = 0.5 * width - 0.5 * mywidth, 0.5 * width + 0.5 * mywidth
-        elif align == 'left':
-            l, r = 0,  mywidth
-        elif align == 'right':
-            l, r = width - mywidth, width
         elif align == 'char':
             w = self.out.width_to(self.attrs['char'])
             co = float(self.attrs['charoff'].rstrip('%'))/100.0
@@ -621,8 +612,12 @@ class TableCell:
         elif align == 'justify':
             # XXX I don't know how this works
             l, r = 0, width
+        elif align == 'left':
+            l, r = 0,  mywidth
+        elif align == 'right':
+            l, r = width - mywidth, width
         else:
-            raise ValueError('Invalid align: %s' % align)
+            raise ValueError(f'Invalid align: {align}')
         return l, r
 
     def get_width(self):
@@ -632,10 +627,7 @@ class TableCell:
 
     def set_attributes(self, node):
         a = self.attrs
-        if node.tag == 'th':
-            align = 'center'
-        else:
-            align = 'left'
+        align = 'center' if node.tag == 'th' else 'left'
         a['align'] = align
         a['char'] = self.cnf.decimal_point
         a['charoff'] = '50%'
@@ -729,19 +721,14 @@ class Table:
 
             widths = self.widths = gw
             for row in self.rows:
-                col = 0
-                for cell in row.cells:
+                for col, cell in enumerate(row.cells):
                     cell.wrap_to_width(gw[col])
-                    col += 1
-
             for row in self.rows:
-                col = 0
                 pos = 0
-                for cell in row.cells:
+                for col, cell in enumerate(row.cells):
                     w = widths[col]
                     cell.align(pos+self.lmargin, w)
                     pos += w + spacings[col]
-                    col += 1
                     row.numlines = max(row.numlines, cell.numlines)
 
         for row in self.rows:
@@ -754,8 +741,8 @@ class Table:
                     tabkwds = row.cells[0].out.tags[row.cells[0].out.lines[0][0][1][0]]
                 else:
                     tabkwds = {}
-                    if row is not self.rows[0] and i == 0:
-                        tabkwds['spacing1'] = 6
+                if row is not self.rows[0] and i == 0:
+                    tabkwds['spacing1'] = 6
                 tabtag = str(tabstops)+str(tabkwds)
                 for cell in row.cells:
                     parent.out.insert('end', '\t', (tabtag,))
@@ -770,8 +757,7 @@ class Table:
         widths = self.widths = []
 
         for row in self.rows:
-            col = 0
-            for cell in row.cells:
+            for col, cell in enumerate(row.cells):
                 w = cell.get_width()
                 if col >= len(widths):
                     widths.append(w)
@@ -779,33 +765,25 @@ class Table:
                     widths[col] = max(w, widths[col])
                 row.numlines = max(row.numlines, cell.numlines)
 
-                col += 1
-
         # Extra spacing after column i
         spacings = self.spacings = [0] * len(widths)
 
         MINSPACING = 10
 
         for row in self.rows:
-            col = 0
-            for cell in row.cells[:-1]:
+            for col, cell in enumerate(row.cells[:-1]):
                 rcell = row.cells[col+1]
                 ledge = cell.get_edges(widths[col])[1]
                 redge = rcell.get_edges(widths[col+1])[0]+widths[col]
                 spacing = MINSPACING - (redge - ledge)
                 spacings[col] = max(spacing, spacings[col])
-                col += 1
-
         width = 0
         for row in self.rows:
-            col = 0
             pos = 0
-            for cell in row.cells:
+            for col, cell in enumerate(row.cells):
                 w = widths[col]
                 cell.align(pos+self.lmargin, w)
                 pos += w + spacings[col]
-                col += 1
-
             if pos > width:
                 width = pos
 
@@ -836,7 +814,7 @@ class RecordingInter:
         self.clearmemo()
 
     def __str__(self):
-        return 'APPENDS: %s TAG_CONFIGS: %s' % (self.appends, self.tag_configs)
+        return f'APPENDS: {self.appends} TAG_CONFIGS: {self.tag_configs}'
 
     def clearmemo(self):
         self.memo = {}          # Maps any value to it self
@@ -881,11 +859,7 @@ class RecordingInter:
         for (tag, kwdlist) in list(self.tag_configs.items()):
 
             if self.FLATKWDS:
-                kwds = {}
-                i = 0
-                while i < len(kwdlist):
-                    kwds[kwdlist[i]] = kwdlist[i+1]
-                    i += 2
+                kwds = {kwdlist[i]: kwdlist[i+1] for i in range(0, len(kwdlist), 2)}
                 out.tag_config(tag, **kwds)
             else:
                 out.tag_config(tag, **dict(kwdlist))
@@ -907,8 +881,7 @@ class RecordingInter:
             k = self.memo.setdefault(k, k)
             v = self.memo.setdefault(v, v)
             if self.FLATKWDS:
-                kwdlist.append(k)
-                kwdlist.append(v)
+                kwdlist.extend((k, v))
             else:
                 kv = k, v
                 kv = self.memo.setdefault(kv, kv)
@@ -1013,10 +986,9 @@ class _GLUECLAMP_:
             inrecorder = pickle.loads(inpickle)
 
         if node is None:
-            if text is None:
-                if filename is not None:
-                    with open(filename) as f:
-                        text = f.read()
+            if text is None and filename is not None:
+                with open(filename) as f:
+                    text = f.read()
             node = self.node_of_string(text, nostrip=1)
 
         if htmloutfile is not None:
@@ -1032,7 +1004,7 @@ class _GLUECLAMP_:
         if filename is not None:
             sp = self.os.path.splitext(filename)
             if sp[1] == '.gsl':
-                cache = sp[0] + '.gsc'
+                cache = f'{sp[0]}.gsc'
 
         m = self._root.guppy.etc.textView.TextViewer(
             parent, 'Untitled', data='')
@@ -1062,12 +1034,11 @@ class _GLUECLAMP_:
                     r.prepare_for_pickle()
                     f = open(cache, 'w')
                     try:
-                        try:
-                            f.write(textdigest)
-                        except IOError:
-                            pass  # maybe write protected just ignore for now XXX
-                        else:
-                            pickle.dump(r, f, 0)
+                        f.write(textdigest)
+                    except IOError:
+                        pass  # maybe write protected just ignore for now XXX
+                    else:
+                        pickle.dump(r, f, 0)
                     finally:
                         f.close()
             r.play(v)
@@ -1075,13 +1046,11 @@ class _GLUECLAMP_:
         else:
             self.node2inter(node, v)
 
-        title = getattr(v, '_gsl_title', None)
-        if title:
+        if title := getattr(v, '_gsl_title', None):
             m.title(title)
             m.iconname(title)
 
-        geometry = getattr(v, '_gsl_tk_geometry', None)
-        if geometry:
+        if geometry := getattr(v, '_gsl_tk_geometry', None):
             m.geometry(geometry)
 
         v['state'] = 'disabled'

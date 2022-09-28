@@ -200,7 +200,7 @@ class Printer:
 
     def getattr(self, mp, attr):
         try:
-            g = getattr(self, '_get_'+attr)
+            g = getattr(self, f'_get_{attr}')
         except AttributeError:
             return getattr(self.client, attr)
         else:
@@ -273,10 +273,7 @@ class Printer:
 
     def get_more_state_msg(self, start_lineno, end_lineno):
         num_lines = self.get_num_lines()
-        if num_lines is None:
-            of_num_lines = ''
-        else:
-            of_num_lines = ' of %d' % num_lines
+        of_num_lines = '' if num_lines is None else ' of %d' % num_lines
         return "Lines %d..%d%s. " % (start_lineno, end_lineno, of_num_lines)
 
     def get_more_msg(self, start_lineno, end_lineno):

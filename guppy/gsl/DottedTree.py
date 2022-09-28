@@ -31,7 +31,7 @@ class Node(object):
         self.index = index
 
     def as_sexpr(self):
-        return (self.tag,) + tuple([c.as_sexpr() for c in self.children])
+        return (self.tag,) + tuple(c.as_sexpr() for c in self.children)
 
     def __repr__(self):
         return '%s(%r, %r, %r)' % (
@@ -118,10 +118,7 @@ class _GLUECLAMP_:
             if (t.startswith(quotechar+dotchar) or
                     t.startswith(quotechar+quotechar+dotchar)):
                 tag[i] = t[len(quotechar):]
-        if tag == ['']:
-            tag = '\n'
-        else:
-            tag = '\n'.join(tag)
+        tag = '\n' if tag == [''] else '\n'.join(tag)
         while 1:
             if (nextvar is None or len(nextvar) <= pos
                 or nextvar[pos] != dotchar or
@@ -143,10 +140,7 @@ class _GLUECLAMP_:
         return node
 
     def parse_string(self, string, src=None):
-        if string:
-            lines = string.split('\n')
-        else:
-            lines = []
+        lines = string.split('\n') if string else []
         return self.parse_lines(lines, src)
 
     ##

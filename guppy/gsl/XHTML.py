@@ -22,11 +22,19 @@ class Node2XHTML:
 
         # xxx where do this?
         charset = 'utf-8'
-        self.header_nodes.append(self.mod.node_of_taci(
-            'meta', '', (
-                self.mod.node_of_taci('http-equiv=', 'Content-Type'),
-                self.mod.node_of_taci('content=',
-                                      'text/html; charset=%s' % charset))))
+        self.header_nodes.append(
+            self.mod.node_of_taci(
+                'meta',
+                '',
+                (
+                    self.mod.node_of_taci('http-equiv=', 'Content-Type'),
+                    self.mod.node_of_taci(
+                        'content=', f'text/html; charset={charset}'
+                    ),
+                ),
+            )
+        )
+
 
         if node is not None:
             node.accept(self)
@@ -42,9 +50,9 @@ class Node2XHTML:
                 pass
 
     def begin(self, tag, arg=''):
-        t = '<'+tag
+        t = f'<{tag}'
         if arg:
-            t = t + ' ' + arg
+            t = f'{t} {arg}'
         if tag in self.mod._no_end_tag_elements:
             # Quote from: http://gutenberg.hwg.org/markupXHTML.html
             #     N.B. The penultimate closing slash on empty elements such as the <img/>
@@ -76,10 +84,10 @@ class Node2XHTML:
 
     def end(self, tag):
         self.indent -= self.indentstep
-        self.append('</%s>' % tag)
+        self.append(f'</{tag}>')
 
     def error(self, msg, *args, **kwds):
-        msg = 'Doc2XHTML: ' + msg
+        msg = f'Doc2XHTML: {msg}'
         self.error_report(msg, *args, **kwds)
 
     def error_report(self, msg, *args, **kwds):
@@ -136,7 +144,7 @@ class Node2XHTML:
         #self.begin('a', 'href="gsl.html"')
         self.append('GSL-XHTML 0.1.7')
         self.end('a')
-        self.append(' on '+self.mod.time.asctime(self.mod.time.localtime()))
+        self.append(f' on {self.mod.time.asctime(self.mod.time.localtime())}')
 
     def gen_meta(self, node, tag=None):
         mknode = self.mod.node_of_taci
@@ -197,7 +205,7 @@ class Node2XHTML:
     def visit_char(self, node):
         name = node.get_namearg()
         if name in self.mod.name2codepoint:
-            name = '&%s;' % name
+            name = f'&{name};'
         else:
             if name[:2] == "0x":
                 char = int(name[2:], 16)
@@ -206,10 +214,7 @@ class Node2XHTML:
             else:
                 self.error('No such character: %r.' % name, node)
             name = self.mod.codepoint2name.get(char)
-            if name is None:
-                name = '&#%d;' % char
-            else:
-                name = '&%s;' % name
+            name = '&#%d;' % char if name is None else f'&{name};'
         self.append(name)
         self._visit_children(node)
 
@@ -244,9 +249,9 @@ class Node2XHTML:
         # self.gen_generated_from_gsl()
 
         newout = self.chg_out(oldout)
-        mknode = self.mod.node_of_taci
         lang = self.document_lang
         if not lang:
+            mknode = self.mod.node_of_taci
             lang = mknode('document_lang', 'en')
 
         self.indent = 0
@@ -295,7 +300,7 @@ class Node2XHTML:
         name = node.arg
         docname = node.children[0].arg
         children = node.children[1:]
-        uri = '%s.html#%s' % (docname, self.encode_link_name(name))
+        uri = f'{docname}.html#{self.encode_link_name(name)}'
         self.begin('a', 'href=%r' % uri)
         if not children:
             self.append(self.encode(name))
@@ -306,7 +311,7 @@ class Node2XHTML:
 
     def visit_link_to_local(self, node):
         name = node.arg
-        uri = '#%s' % self.encode_link_name(name)
+        uri = f'#{self.encode_link_name(name)}'
         self.begin('a', 'href=%r' % uri)
         if not node.children:
             self.append(self.encode(name))
@@ -499,20 +504,14 @@ class _GLUECLAMP_:
     # I have also included the deprecated and the 4.0 only
 
     def _get_stdhtml(self):
-        sh = {}
-        for x in self._html3_2 + self._html4_0_deprecated + self._html4_0:
-            sh[x] = 1
-        return sh
+        return {x: 1 for x in self._html3_2 + self._html4_0_deprecated + self._html4_0}
 
     def _get_line_break_allowed(self):
-        sh = {}
-        for x in self._line_break_allowed:
-            sh[x] = 1
-        return sh
+        return {x: 1 for x in self._line_break_allowed}
 
     def doc2filer(self, doc, node, name, dir, opts, IO):
         text = self.doc2text(doc, node)
-        path = IO.path.join(dir, '%s.html' % name)
+        path = IO.path.join(dir, f'{name}.html')
         node = self.node_of_taci('write_file', path, [
                                  self.node_of_taci('text', text)])
         return node
@@ -527,8 +526,7 @@ class _GLUECLAMP_:
             f.write(text)
 
     def node2text(self, node):
-        text = Node2XHTML(self, node).get_html()
-        return text
+        return Node2XHTML(self, node).get_html()
 
     # Adapted from html4css1.py in docutils
 

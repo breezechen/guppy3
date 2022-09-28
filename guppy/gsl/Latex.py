@@ -54,7 +54,7 @@ class Doc2Latex:
         self.abs_size(self.cur_size + delta, node)
 
     def error(self, msg, *args, **kwds):
-        msg = 'Doc2Latex: ' + msg
+        msg = f'Doc2Latex: {msg}'
         self.doc.env.error(msg, *args, **kwds)
 
     def get_latex(self):
@@ -71,10 +71,7 @@ class Doc2Latex:
         self.cur_style = style
         node.arg_accept(self)
         self.cur_style = ostyle
-        if style == 'em':
-            self.append('\\/}')
-        else:
-            self.append('\\/}')
+        self.append('\\/}')
 
     def visit_a(self, node):
         pass
@@ -440,14 +437,13 @@ class Table(Doc2Latex):
 
         if not maxcols:
             return  # Empty table
-        if self.colwidth is not None:
-            if not len(self.colwidth) == maxcols:
-                self.error("Wrong number of column width specifications (%d) vs\n"
-                           "    max columns in table (%d)." % (
-                               len(self.colwidth), maxcols),
-                           node)
-        else:
+        if self.colwidth is None:
             self.colwidth = [1.0/maxcols]*maxcols
+        elif len(self.colwidth) != maxcols:
+            self.error("Wrong number of column width specifications (%d) vs\n"
+                       "    max columns in table (%d)." % (
+                           len(self.colwidth), maxcols),
+                       node)
         ap = self.d2l.append
         ap('\n\\begin{longtable}[c]{|%s|}\n' % ('|'.join(['p{%.2g\\linewidth}' % cw
                                                           for cw in self.colwidth])))
@@ -460,9 +456,8 @@ class Table(Doc2Latex):
                     if self.many_hlines:
                         ap('\\\\\n')
                         ap('\\hline\n')
-                    else:
-                        if row is not self.rows[-1]:
-                            ap('\\\\\n')
+                    elif row is not self.rows[-1]:
+                        ap('\\\\\n')
                 else:
                     ap('&\n')
             if row.is_head:
@@ -590,26 +585,25 @@ class Babel:
     def quote_quotes(self, text):
         t = None
         for part in text.split('"'):
-            if t == None:
+            if t is None:
                 t = part
             else:
                 t += self.next_quote() + part
         return t
 
     def double_quotes_in_tt(self, text):
-        if not self.double_quote_replacment:
-            return text
-        return text.replace('"', self.double_quote_replacment)
+        return (
+            text.replace('"', self.double_quote_replacment)
+            if self.double_quote_replacment
+            else text
+        )
 
     def get_language(self):
         if self.language in self._ISO639_TO_BABEL:
             return self._ISO639_TO_BABEL[self.language]
-        else:
-            # support dialects.
-            l = self.language.split("_")[0]
-            if l in self._ISO639_TO_BABEL:
-                return self._ISO639_TO_BABEL[l]
-        return None
+        # support dialects.
+        l = self.language.split("_")[0]
+        return self._ISO639_TO_BABEL[l] if l in self._ISO639_TO_BABEL else None
 
 
 class Encoder:
@@ -769,12 +763,8 @@ class Encoder:
             # ! LaTeX Error: There's no line here to end.
             text = text.replace("\n", '~\\\\\n')
         elif self.mbox_newline:
-            if self.literal_block:
-                closings = "}" * len(self.literal_block_stack)
-                openings = "".join(self.literal_block_stack)
-            else:
-                closings = ""
-                openings = ""
+            closings = ""
+            openings = ""
             text = text.replace(
                 "\n", "%s}\\\\\n\\mbox{%s" % (closings, openings))
         # lines starting with "[" give errors.
@@ -815,7 +805,7 @@ class _GLUECLAMP_:
 
     def doc2filer(self, doc, node, name, dir, opts, IO):
         text = self.doc2text(doc, node)
-        path = IO.path.join(dir, '%s.tex' % name)
+        path = IO.path.join(dir, f'{name}.tex')
         node = self.node_of_taci('write_file', path, [
                                  self.node_of_taci('text', text)])
         return node

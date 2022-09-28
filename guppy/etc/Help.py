@@ -46,8 +46,7 @@ class GuppyDoc:
 
     def _substitute(self, str):
         rp = self.mod._root.guppy.heapy.Use.reprefix
-        str = str.replace('$HP.', rp)
-        return str
+        return str.replace('$HP.', rp)
 
     def __repr__(self):
         return self.str
@@ -100,14 +99,16 @@ class GuppyDir(object):
     def __repr__(self):
         opts = self.opts
         if 'L' in opts:
-            r = ''
-            for d in self.li:
-                r += '*** ' + d + ' ***\n' + repr(getattr(self, d))+'\n\n'
+            r = ''.join(
+                f'*** {d}' + ' ***\n' + repr(getattr(self, d)) + '\n\n'
+                for d in self.li
+            )
+
         elif 'l' in opts:
             r = ''
             for d in self.li:
                 t = getattr(self, d).getheader()
-                if not (t.startswith(d) or t.startswith('x.'+d)):
+                if not (t.startswith(d) or t.startswith(f'x.{d}')):
                     t = d
                 r += t + '\n\n'
         else:
@@ -147,10 +148,9 @@ class _GLUECLAMP_:
             for gm in dir(clamp):
                 if gm.startswith('_get_'):
                     dl.append(gm[5:])
-                else:
-                    if not gm.startswith('_'):
-                        dl.append(gm)
-            dl = [d for d in dl if not d in private]
+                elif not gm.startswith('_'):
+                    dl.append(gm)
+            dl = [d for d in dl if d not in private]
         dl.sort()
         return GuppyDir(dl, obj, self, opts, **kwds)
 
@@ -172,23 +172,19 @@ class _GLUECLAMP_:
         else:
             for imp in imports:
                 ix = imp.find(':')
-                if ix == -1:
-                    pass
-                else:
-                    if imp[ix+1:] == name:
-                        return self.getdoc_import(obj, clamp, name, imp, ix)
+                if ix != -1 and imp[ix + 1 :] == name:
+                    return self.getdoc_import(obj, clamp, name, imp, ix)
         for gm in dir(clamp):
             if gm.startswith('_get_') and gm[5:] == name:
                 return self.getdoc__get_(clamp, gm)
-            else:
-                if name == gm:
-                    return self.getdoc_other(clamp, name)
+            if name == gm:
+                return self.getdoc_other(clamp, name)
 
         return GuppyDoc(self, '???')
 
     def getdoc_no_share(self, obj, name):
         try:
-            doc = getattr(obj, '_doc_'+name)
+            doc = getattr(obj, f'_doc_{name}')
         except AttributeError:
             pass
         else:
@@ -196,11 +192,7 @@ class _GLUECLAMP_:
 
         cl = obj.__class__
         p = getattr(cl, name)
-        if isinstance(p, property):
-            docobj = p
-        else:
-            docobj = getattr(obj, name)
-
+        docobj = p if isinstance(p, property) else getattr(obj, name)
         return self.getdoc_obj(docobj)
 
     def getdoc__get_(self, clamp, gm):
@@ -210,8 +202,8 @@ class _GLUECLAMP_:
 
     def getdoc_import(self, obj, clamp, name, imp, ix):
         doc = ''
-        if hasattr(clamp, '_doc_'+name):
-            doc = getattr(obj, '_doc_'+name)
+        if hasattr(clamp, f'_doc_{name}'):
+            doc = getattr(obj, f'_doc_{name}')
         else:
             impobj = getattr(obj, imp[ix+1:])
             doc = getattr(impobj, '__doc__')
@@ -230,7 +222,7 @@ class _GLUECLAMP_:
             return GuppyDoc(self, doc)
 
         try:
-            doc = getattr(obj, '_doc_'+name)
+            doc = getattr(obj, f'_doc_{name}')
         except AttributeError:
             doc = ''
         if doc is None:
@@ -239,7 +231,7 @@ class _GLUECLAMP_:
         return GuppyDoc(self, doc)
 
     def docurl(self, url):
-        url = 'https://zhuyifei1999.github.io/guppy3/'+url
+        url = f'https://zhuyifei1999.github.io/guppy3/{url}'
         return url
 
     def open_browser(self, url):

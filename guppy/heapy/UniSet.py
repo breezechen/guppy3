@@ -84,7 +84,7 @@ False otherwise.
             other = self.fam.c_uniset(other)
         return self.fam.c_le(self, other)
 
-    def __lshift__(return_spec, argument_spec):
+    def __lshift__(self, argument_spec):
         """
 <<This is about to change, does not work as one may expected.
 Nov 19 2005. >>>
@@ -108,7 +108,7 @@ way as when using the 'mapping' function in the Spec.py module.
 
 
 """
-        return return_spec.fam.c_lshift(return_spec, argument_spec)
+        return self.fam.c_lshift(self, argument_spec)
 
     def __lt__(self, other):
         """
@@ -740,23 +740,21 @@ class Family:
         if self.export_dict is self.mod.export_dict:
             self.export_dict = self.mod.export_dict.copy()
         if name in self.export_dict and self.export_dict[name] is not value:
-            raise ValueError('Duplicate: %s' % name)
+            raise ValueError(f'Duplicate: {name}')
         self.export_dict[name] = value
 
     def c_alt(self, a, cmp):
-        raise ValueError('No alternative set for family %s.' % self)
+        raise ValueError(f'No alternative set for family {self}.')
 
     def c_binop(self, op, a, b):
         if not isinstance(b, UniSet):
             b = self.c_uniset(b)
-        r = getattr(self, 'c_'+op)(a, b)
         # r = self.Doc.add_origin(r, self.Doc.binop(op, a.doc, b.doc))
-        return r
+        return getattr(self, f'c_{op}')(a, b)
 
     def c_unop(self, op, a):
-        r = getattr(self, 'c_'+op)(a)
         # r = self.Doc.add_origin(r, self.Doc.unop(op, a.doc))
-        return r
+        return getattr(self, f'c_{op}')(a)
 
     def c_derive_origin(self, a, b):
         return self.Doc.add_origin(a, b)
@@ -782,10 +780,10 @@ class Family:
         # Given a and b factors, and not a <= b and not b <= a,
         # determine if they are disjoint
 
-        return getattr(self, '_factordisjoint_%s' % (b.fam.opname,))(a, b)
+        return getattr(self, f'_factordisjoint_{b.fam.opname}')(a, b)
 
     def c_get_brief_alt(self, a, alt):
-        return '[%s %s]' % (alt, self.c_get_brief(a))
+        return f'[{alt} {self.c_get_brief(a)}]'
 
     def c_uniset(self, X):
         return self.mod.uniset_from_setcastable(X)
@@ -795,9 +793,7 @@ class Family:
 
     def c_getattr(self, a, b, args=(), kwds={}):
         d = self.export_dict
-        if b in d:
-            return d[b](a, *args, **kwds)
-        return self.c_getattr2(a, b)
+        return d[b](a, *args, **kwds) if b in d else self.c_getattr2(a, b)
 
     def c_getattr2(self, a, b):
         raise AttributeError(b)
@@ -820,7 +816,7 @@ class Family:
         return h
 
     def c_get_idpart_label(self, a):
-        return '<%s>' % a
+        return f'<{a}>'
 
     def c_get_idpart_render(self, a):
         return self.c_get_render(a)
@@ -869,9 +865,13 @@ class Family:
         return a & ~b
 
     def c_test_contains(self, a, b, env):
-        if not self.c_contains(a, b):
-            return env.failed('%s: %s does not contain %s' % (self.__class__, env.name(a), env.name(b)))
-        return True
+        return (
+            True
+            if self.c_contains(a, b)
+            else env.failed(
+                f'{self.__class__}: {env.name(a)} does not contain {env.name(b)}'
+            )
+        )
 
     def c_xor(self, a, b):
         return (a - b) | (b - a)
@@ -998,9 +998,7 @@ class AndFamily(Family):
             return a
         if b <= a:
             return b
-        if a.fam.c_factordisjoint(a, b):
-            return self.mod.Nothing
-        return self._cons((a, b))
+        return self.mod.Nothing if a.fam.c_factordisjoint(a, b) else self._cons((a, b))
 
     def _cons(self, arg):
         # We allow explicit non-normalized constructions, as an optimization
@@ -1023,9 +1021,8 @@ class AndFamily(Family):
             else:
                 for ei in list(e):
                     for aj in a.arg:
-                        if aj is not ai:
-                            if not env.contains(aj, ei):
-                                break
+                        if aj is not ai and not env.contains(aj, ei):
+                            break
                     else:
                         ex.append(ei)
         return ex
@@ -1084,10 +1081,7 @@ class AndFamily(Family):
         return b.fam._le_AND(b, a)
 
     def _ge_TERM(self, a, b):
-        for a in a.arg:
-            if not a >= b:
-                return False
-        return True
+        return all(a >= b for a in a.arg)
 
     _ge_ATOM = _ge_INVERT = _ge_AND = _ge_TERM
 
@@ -1138,16 +1132,17 @@ class AndFamily(Family):
         return r
 
     def c_contains(self, a, b):
-        for x in a.arg:
-            if b not in x:
-                return False
-        return True
+        return all(b in x for x in a.arg)
 
     def c_test_contains(self, a, b, env):
-        for x in a.arg:
-            if not env.test_contains(x, b, 'and'):
-                return env.failed('Failed')
-        return True
+        return next(
+            (
+                env.failed('Failed')
+                for x in a.arg
+                if not env.test_contains(x, b, 'and')
+            ),
+            True,
+        )
 
     def c_disjoint3(self, a, b):
         return (a & b) is self.mod.Nothing
@@ -1165,7 +1160,7 @@ class AndFamily(Family):
     def c_get_brief(self, c):
         names = [kind.brief for kind in c.arg]
         # names.sort() ?? I think now I want them in given order.
-        return '(%s)' % ' & '.join(names) + ')'
+        return f"({' & '.join(names)}))"
 
     def c_get_ckc(self, a):
         return (
@@ -1176,7 +1171,7 @@ class AndFamily(Family):
 
     def c_repr(self, a):
         reprs = [repr(k) for k in a.arg]
-        return '(%s)' % ' & '.join(reprs)
+        return f"({' & '.join(reprs)})"
 
 
 class OrFamily(Family):
@@ -1187,9 +1182,7 @@ class OrFamily(Family):
     def __call__(self, a, b):
         if b <= a:
             return a
-        if a <= b:
-            return b
-        return self._cons((a, b))
+        return b if a <= b else self._cons((a, b))
 
     def _cons(self, arg):
         # Must only be called with maximalized args
@@ -1203,10 +1196,7 @@ class OrFamily(Family):
             return self.mod.Nothing
 
     def c_contains(self, a, b):
-        for x in a.arg:
-            if b in x:
-                return True
-        return False
+        return any(b in x for x in a.arg)
 
     def c_get_ckc(self, a):
         return self.mod.Use.findex(*a.arg).classifier, len(a.arg), '<'
@@ -1230,10 +1220,7 @@ class OrFamily(Family):
         return env.forsome(a.arg, lambda x: env.test_contains(x, b, 'Some x'), 'or')
 
     def c_and(self, a, b):
-        if self is b.fam:
-            return self._and_OR(a, b)
-        else:
-            return self._and_TERM(a, b)
+        return self._and_OR(a, b) if self is b.fam else self._and_TERM(a, b)
 
     def _and_TERM(self, a, b):
         # (a0 | a1 ..) & b = a0 & b | a1 & b | ...
@@ -1261,26 +1248,19 @@ class OrFamily(Family):
 
     def _ge_TERM(self, a, b):
         a = a & b
-        if a.fam is self:
-            if b.fam is not a.fam or len(b.arg) != len(a.arg):
-                return False
-            assert 0
-        else:
+        if a.fam is not self:
             return b <= a
+        if b.fam is not a.fam or len(b.arg) != len(a.arg):
+            return False
+        assert 0
 
     _ge_ATOM = _ge_INVERT = _ge_AND = _ge_TERM
 
     def c_ge(self, a, b):
-        if b.fam is self:
-            return self.c_le(b, a)
-        else:
-            return self._ge_TERM(a, b)
+        return self.c_le(b, a) if b.fam is self else self._ge_TERM(a, b)
 
     def c_le(self, a, b):
-        for x in a.arg:
-            if not x <= b:
-                return False
-        return True
+        return all(x <= b for x in a.arg)
 
     _le_ATOM = _le_INVERT = _le_AND = c_le
 
@@ -1318,12 +1298,12 @@ class OrFamily(Family):
         renders = self.mod.mutnodeset([kind.get_render() for kind in c.arg])
         if len(renders) == 1:
             return list(renders)[0]
-        else:
-            def r(o):
-                return hex(id(o))
-            r._idpart_header = 'Address'
-            r._idpart_sortrender = lambda x: id(x)
-            return r
+        def r(o):
+            return hex(id(o))
+
+        r._idpart_header = 'Address'
+        r._idpart_sortrender = lambda x: id(x)
+        return r
 
     def c_get_brief(self, c):
         names = [kind.brief for kind in c.arg]
@@ -1355,7 +1335,7 @@ class OrFamily(Family):
                 brmemo[k] = br
             b, r = br
 
-            return '%s: %s' % (b, r(x))
+            return f'{b}: {r(x)}'
 
         return render
 
@@ -1385,7 +1365,7 @@ class OrFamily(Family):
     def c_repr(self, a):
         reprs = [repr(k) for k in a.arg]
         reprs.sort()
-        return '(%s)' % ' | '.join(reprs)
+        return f"({' | '.join(reprs)})"
 
 
 class InvertFamily(Family):
@@ -1404,7 +1384,7 @@ class InvertFamily(Family):
         return env.test_contains_not(a.arg, b, 'InvertFamily')
 
     def c_contains(self, a, b):
-        return not b in a.arg
+        return b not in a.arg
 
     def c_and(self, a, b):
         return b.fam._and_INVERT(b, a)
@@ -1462,9 +1442,7 @@ class InvertFamily(Family):
         if a.arg <= b:
             return ~self.mod.Nothing
         x = a.arg & b
-        if x is self.mod.Nothing:
-            return a
-        return self.mod.fam_Or(a, b)
+        return a if x is self.mod.Nothing else self.mod.fam_Or(a, b)
 
     _or_ATOM = _or_INVERT = _or_FACTOR
 
@@ -1477,10 +1455,9 @@ class InvertFamily(Family):
 
     def c_get_brief(self, a):
         n = a.arg.brief
-        if (not (n.startswith('(') or n.startswith('<')) and
-                ' ' in n):
-            n = '(%s)' % n
-        return '~%s' % n
+        if not n.startswith('(') and not n.startswith('<') and ' ' in n:
+            n = f'({n})'
+        return f'~{n}'
 
     def c_get_ckc(self, a):
         # This uses only existing machinery for C-level classification.
@@ -1493,7 +1470,7 @@ class InvertFamily(Family):
         )
 
     def c_repr(self, a):
-        return '~%s' % repr(a.arg)
+        return f'~{repr(a.arg)}'
 
 
 class FamilyFamily(AtomFamily):
@@ -1505,7 +1482,7 @@ class FamilyFamily(AtomFamily):
         return isinstance(b, UniSet) and b.fam is a.arg
 
     def c_get_brief(self, c):
-        return '<Family: %s>' % c.arg.__class__
+        return f'<Family: {c.arg.__class__}>'
 
 
 class IdentitySetFamily(AtomFamily):
@@ -1546,10 +1523,7 @@ class IdentitySetFamily(AtomFamily):
             return b.fam._and_ID(b, a)
 
     def _and_ATOM(self, a, b):
-        if b.fam is self:
-            return self._cons(a.nodes & b.nodes)
-        else:
-            return b.fam._and_ID(b, a)
+        return self._cons(a.nodes & b.nodes) if b.fam is self else b.fam._and_ID(b, a)
 
     def _and_AND(self, a, b):
         return b.fam._and_ID(b, a)
@@ -1588,7 +1562,7 @@ class IdentitySetFamily(AtomFamily):
         return b in a.nodes
 
     def c_le(self, a, b):
-        if not b.fam is self:
+        if b.fam is not self:
             b = b.fam._and_ID(b, a)
         return a.nodes <= b.nodes
 
@@ -1597,9 +1571,8 @@ class IdentitySetFamily(AtomFamily):
     def c_or(self, a, b):
         if b.fam is self:
             return self._cons(a.nodes | b.nodes)
-        else:
-            a = a - b.fam._and_ID(b, a)
-            return b.fam._or_ATOM(b, a)
+        a = a - b.fam._and_ID(b, a)
+        return b.fam._or_ATOM(b, a)
 
     _or_ATOM = _or_INVERT = _or_AND = _or_OR = c_or
 
@@ -1665,7 +1638,7 @@ class IdentitySetFamily(AtomFamily):
             for s in ss:
                 try:
                     if not s.istitle() or s.startswith('er_'):
-                        s = 'er_'+s
+                        s = f'er_{s}'
                     er = getattr(self.Use, s)
                 except AttributeError:
                     raise ValueError(
@@ -1714,22 +1687,16 @@ class IdentitySetFamily(AtomFamily):
         return p
 
     def get_str_idpart(self, set, cla):
-        # Get the string that is used for the 'identity partition'
-        # when the objects share a common classification (cla)
-        s = cla.fam.c_get_str_for(cla, set)
-        return s
+        return cla.fam.c_get_str_for(cla, set)
 
     def get_str_refpat(self, set, cla, max_length):
         # Get the string that is used at the end of a reference pattern line
-        strs = []
-        strs.append('%d ' % set.count)
-        strs.append(cla.fam.c_get_str_for(cla, set))
-        strs.append(': ')
+        strs = ['%d ' % set.count, cla.fam.c_get_str_for(cla, set), ': ']
         strs.append(self.get_str_rendered(
             set, cla, max_length-len(''.join(strs))))
         s = ''.join(strs)
         if len(s) > max_length:
-            s = s[:max_length - 3]+'...'
+            s = f'{s[:max_length - 3]}...'
         return s
 
     def get_str_rendered(self, set, cla, max_length=None):
@@ -1776,11 +1743,11 @@ class IdentitySetFamily(AtomFamily):
             bstrs.sort(key=lambda x: x[x.index(' '):])
         s += ' | '.join(bstrs) + '>'
         if len(s) > max_length:
-            s = s[:max_length-4]+'...>'
+            s = f'{s[:max_length - 4]}...>'
         return s
 
     def get_parts(self, X):
-        return [x for x in X.partition.get_sets()]
+        return list(X.partition.get_sets())
 
     def get_theone(self, set):
         if len(set.nodes) == 1:
@@ -1832,9 +1799,7 @@ class EmptyFamily(IdentitySetFamily):
         return False
 
     def c_ge(self, a, b):
-        if b is a:
-            return True
-        return False
+        return b is a
 
     _ge_ATOM = _ge_INVERT = _ge_AND = c_ge
 
@@ -1842,7 +1807,7 @@ class EmptyFamily(IdentitySetFamily):
         return '<Nothing>'
 
     def c_repr(self, a):
-        return '%s%s' % (self.mod.Use.reprefix, 'Nothing')
+        return f'{self.mod.Use.reprefix}Nothing'
 
     def c_iter(self, a):
         return iter(())
@@ -1938,7 +1903,7 @@ class EquivalenceRelationFamily(AtomFamily):
         return a.classifier.get_userkind(*args, **kwds)
 
     def c_get_brief(self, a):
-        return 'Equiv. relation %s' % a.classifier
+        return f'Equiv. relation {a.classifier}'
 
     def c_getitem(self, a, idx):
         return a.classifier.relimg(self.mod.nodeset_adapt(idx))
@@ -1951,10 +1916,12 @@ class Summary_str:
     def __init__(self, mod):
         self.mod = mod
         types = mod.types._module
-        self.invtypes = {}
-        for k, v in sorted(types.__dict__.items()):
-            if isinstance(v, type):
-                self.invtypes[v] = 'types.%s' % k
+        self.invtypes = {
+            v: f'types.{k}'
+            for k, v in sorted(types.__dict__.items())
+            if isinstance(v, type)
+        }
+
         for k, v in sorted(types.__builtins__.items()):
             if isinstance(v, type):
                 self.invtypes[v] = k
@@ -1964,7 +1931,7 @@ class Summary_str:
 
         self.shorter_invtypes = {}
         for name in ('module', 'function'):
-            t = getattr(types, name.capitalize()+'Type')
+            t = getattr(types, f'{name.capitalize()}Type')
             self.shorter_invtypes[t] = name
 
         self.table = {
@@ -1992,10 +1959,7 @@ class Summary_str:
     def __call__(self, key, longer=False):
         x = self.table.get(key)
         if x is None:
-            if issubclass(key, type):
-                x = self.str_type
-            else:
-                x = self.str_address
+            x = self.str_type if issubclass(key, type) else self.str_address
         if longer and 'longer' in x.__func__.__code__.co_varnames:
             return lambda k: x(k, longer=longer)
         else:
@@ -2018,7 +1982,7 @@ class Summary_str:
         n = x.__name__
         m = x.__module__
         if m != 'builtins':
-            n = '%s.%s' % (m, n)
+            n = f'{m}.{n}'
         return n
     str_builtin_function._idpart_header = 'Name'
 
@@ -2029,11 +1993,11 @@ class Summary_str:
     str_code._idpart_header = 'File:Line:Name'
 
     def str_frame(self, x):
-        return '<%s at %s>' % (x.f_code.co_name, self.str_address(x))
+        return f'<{x.f_code.co_name} at {self.str_address(x)}>'
     str_frame._idpart_header = 'Name at Address'
 
     def str_function(self, x):
-        return '%s.%s' % (x.__module__, x.__name__)
+        return f'{x.__module__}.{x.__name__}'
     str_function._idpart_header = 'Name'
 
     def str_len(self, x):
@@ -2043,13 +2007,13 @@ class Summary_str:
     def str_method(self, x):
         cn = self.str_type(x.__self__.__class__)
         if x.__self__ is not None:
-            cn = '<%s at %s>' % (cn, self.str_address(x.__self__))
+            cn = f'<{cn} at {self.str_address(x.__self__)}>'
         func = x.__func__
         try:
             func_name = func.__func__
         except AttributeError:
             func_name = func.__name__
-        return '%s.%s' % (cn, func_name)
+        return f'{cn}.{func_name}'
     str_method._idpart_header = 'Type/<Type at address> . method'
 
     def str_module(self, x):
@@ -2063,7 +2027,7 @@ class Summary_str:
     str_repr = repr
 
     def str_traceback(self, x):
-        return '<in frame %s at %s>' % (self.str_frame(x.tb_frame), self.str_address(x))
+        return f'<in frame {self.str_frame(x.tb_frame)} at {self.str_address(x)}>'
     str_traceback._idpart_header = 'Frame at Address'
 
     def str_type(self, x, longer=False):
@@ -2071,15 +2035,17 @@ class Summary_str:
             return self.shorter_invtypes[x]
         if x in self.invtypes:
             return self.invtypes[x]
-        if not hasattr(x, '__module__'):
-            return f'<unknown module>.{x.__name__}'
-        return f'{x.__module__}.{x.__name__}'
+        return (
+            f'{x.__module__}.{x.__name__}'
+            if hasattr(x, '__module__')
+            else f'<unknown module>.{x.__name__}'
+        )
     str_type._idpart_header = 'Name'
 
     def str_type_longer(self, x):
         if x in self.invtypes:
             return self.invtypes[x]
-        return '%s.%s' % (x.__module__, x.__name__)
+        return f'{x.__module__}.{x.__name__}'
     str_type._longer_method = lambda x: str_type
 
 
@@ -2168,10 +2134,10 @@ class _GLUECLAMP_:
         return d
 
     def _get_out_reach_dict(self):
-        d = {}
-        for name in self.out_reach_module_names:
-            d[name] = getattr(self._parent, name)
-        return d
+        return {
+            name: getattr(self._parent, name)
+            for name in self.out_reach_module_names
+        }
 
     def _get_summary_str(self): return self.Summary_str(self)
 
@@ -2248,13 +2214,6 @@ class _GLUECLAMP_:
         for b in args[1:]:
             a |= b
         return a
-
-        # This optimization didn't work for idsets!!
-        # XXX to fix back
-
-        if not maximized:
-            args = maximals(args)
-        return self.fam_Or._cons(args)
 
     def uniset_from_setcastable(self, X):
         if isinstance(X, UniSet) and X._hiding_tag_ is self._hiding_tag_:

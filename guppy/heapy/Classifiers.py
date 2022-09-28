@@ -46,7 +46,7 @@ class Classifier:
         return self.mod.alt(kind, alt)
 
     def get_dictof(self, kind):
-        name = '%s.dictof' % self.name
+        name = f'{self.name}.dictof'
         er = self.mod.mker_memoized(
             name,
             lambda:
@@ -67,7 +67,7 @@ class Classifier:
         return ka
 
     def get_reprname(self):
-        return '%s%s' % (self.mod.Use.reprefix, self.name)
+        return f'{self.mod.Use.reprefix}{self.name}'
 
     def get_sokind(self, er, *args, **kwds):
         k = er(*args, **kwds)
@@ -76,9 +76,10 @@ class Classifier:
     def get_sokindrepr(self, sokind):
         # Get the representation of a set of kinds
         # from this classifier / eqv. relation.
-        return '%s.sokind%s' % (self.get_reprname(),
-                                ''.join(['(%s)' % self.get_userkindargrepr(k)
-                                         for k in sokind.kinds]))
+        return '%s.sokind%s' % (
+            self.get_reprname(),
+            ''.join([f'({self.get_userkindargrepr(k)})' for k in sokind.kinds]),
+        )
 
     def get_tabheader(self, ctx=''):
         # If ctx = 'and', get the table header when used as a part of the 'and' classifier.
@@ -125,8 +126,7 @@ class Classifier:
             lambda a: self.cli.select(a, b, cmp))
 
     def select_ids(self, X, k, alt=None):
-        r = self.mod.Use.idset(self.select_cli(X.nodes, k, alt))
-        return r
+        return self.mod.Use.idset(self.select_cli(X.nodes, k, alt))
 
 
 class SoKind(object):
@@ -166,7 +166,7 @@ class CallableSoKind(SoKind):
 
 class SoNoKind(SoKind):
     def __repr__(self):
-        return '%s%s' % (self.classifier.mod.Use.reprefix, 'sonokind')
+        return f'{self.classifier.mod.Use.reprefix}sonokind'
 
 
 class QuickSoKind(SoKind):
@@ -184,7 +184,7 @@ class QuickSoKind(SoKind):
     er = property(_get_er)
 
     def _get_kinds(self):
-        return tuple([self.classifier.get_kind(k) for k in self.clikinds])
+        return tuple(self.classifier.get_kind(k) for k in self.clikinds)
 
     kinds = property(_get_kinds)
 
@@ -215,10 +215,10 @@ class IdentityFamily:
         return self.mod.Use.idset(b.nodes & [a.arg])
 
     def c_get_brief(self, a):
-        return '<id %s>' % hex(id(a.arg))
+        return f'<id {hex(id(a.arg))}>'
 
     def c_repr(self, a):
-        return '%s(%s)' % (self.classifier.get_reprname(), self.classifier.get_userkindargrepr(a))
+        return f'{self.classifier.get_reprname()}({self.classifier.get_userkindargrepr(a)})'
 
 
 class ByIdentity(Classifier):
@@ -299,7 +299,7 @@ class PyObjectFamily:
         return '<Anything>'
 
     def c_repr(self, a):
-        return '%s%s' % (self.mod.Use.reprefix, 'Anything')
+        return f'{self.mod.Use.reprefix}Anything'
 
     def _and_ID(self, a, b):
         # Optimization shortcut
@@ -357,7 +357,7 @@ class IndiSizeFamily:
         return '<size %s %d>' % (alt, a.arg)
 
     def c_repr(self, a):
-        return '%s(%s)' % (self.classifier.get_reprname(), a.arg)
+        return f'{self.classifier.get_reprname()}({a.arg})'
 
 
 class ByIndiSize(Classifier):
@@ -379,10 +379,7 @@ The classification will be individual memory size of the object."""
         return 'Individual Size'
 
     def get_tabrendering(self, cla, ctx=''):
-        if ctx:
-            return '%d' % cla.arg
-        else:
-            return '%9d' % cla.arg
+        return '%d' % cla.arg if ctx else '%9d' % cla.arg
 
 
 class TypeFamily:
@@ -415,7 +412,7 @@ class TypeFamily:
             '>=': 'supertype',
             '>': 'strict supertype'
         }[alt]
-        return '<%s of %s>' % (x, self.c_get_brief(a))
+        return f'<{x} of {self.c_get_brief(a)}>'
 
     def c_repr(self, a):
         return self.classifier.get_repr(a)
@@ -432,7 +429,7 @@ The classification will be the type of the object."""
 
     def get_attr_for_er(self, name):
         try:
-            ty = getattr(self.mod.types, name+'Type')
+            ty = getattr(self.mod.types, f'{name}Type')
         except AttributeError:
             ty = getattr(self.mod.builtins, name.lower())
         return self.get_userkind(ty)
@@ -444,7 +441,7 @@ The classification will be the type of the object."""
         t = kind.arg
         rn = self.get_reprname()
         if t in self.mod.invtypemod:
-            return '%s.%s' % (rn, self.mod.invtypemod[t])
+            return f'{rn}.{self.mod.invtypemod[t]}'
         else:
             return '%s(%r)' % (rn, self.get_userkindarg(kind))
 
@@ -474,31 +471,22 @@ class OwnedDictFamily:
         ka = self._get_ownerkind(a)
         if ka is self.mod.Use.Nothing:
             return self.mod.Use.Type.Dict.get_render()
-        else:
-            ownrender = ka.get_render()
+        ownrender = ka.get_render()
 
-            def render(x):
-                ret = ownrender(self.mod.Use.iso(x).owners.theone)
-                if '.' in ret:
-                    ret = '..'+ret.split('.')[-1]
-                return ret
-            return render
+        def render(x):
+            ret = ownrender(self.mod.Use.iso(x).owners.theone)
+            if '.' in ret:
+                ret = '..'+ret.split('.')[-1]
+            return ret
 
-        if ka == self.mod.fam_Type(self.types.ModuleType):
-            modrender = self.mod.Use.Type.Module.get_render()
-
-            def render(x):
-                return modrender(self.mod.Use.iso(x).owners.theone)
-            return render
-        else:
-            return self.mod.Use.Type.Dict.get_render()
+        return render
 
     def c_get_brief(self, a):
         ka = self._get_ownerkind(a)
         if ka is self.mod.Use.Nothing:
             return 'dict (no owner)'
         else:
-            return 'dict of ' + ka.brief
+            return f'dict of {ka.brief}'
 
     def c_get_ckc(self, a):
         cla, k, cmp = a.arg.get_ckc()
@@ -530,14 +518,14 @@ class OwnedDictFamily:
         if ka is self.mod.Use.Nothing:
             return 'Address*Length'
         else:
-            return 'Owner ' + ka.fam.c_get_idpart_header(ka)
+            return f'Owner {ka.fam.c_get_idpart_header(ka)}'
 
     def c_repr(self, a):
         ka = self._get_ownerkind(a)
         ra = repr(ka)
         if ra.startswith('~'):
-            ra = '(%s)' % ra
-        return '%s.dictof' % ra
+            ra = f'({ra})'
+        return f'{ra}.dictof'
 
 
 class ByDictOwner(Classifier):
@@ -558,7 +546,7 @@ class ByDictOwner(Classifier):
         self.notownedtag = mod.ImpSet.immnodeset([[]])
 
     def get_byname(self):
-        return '[dict of] %s' % self.ownerclassifier.get_byname()
+        return f'[dict of] {self.ownerclassifier.get_byname()}'
 
     def get_cli(self):
         cli = self.hv.cli_dictof(self.ownership, self.ownerclassifier.cli, self.notdicttag,
@@ -582,17 +570,17 @@ class ByDictOwner(Classifier):
             return self.ownerclassifier.get_kindarg(kind.arg)
 
     def get_tabheader(self, ctx=''):
-        return 'Dict of %s' % self.ownerclassifier.get_tabheader(ctx)
+        return f'Dict of {self.ownerclassifier.get_tabheader(ctx)}'
 
     def get_tabrendering(self, kind, ctx=''):
         if kind is self.notdict:
-            r = kind.brief
+            return kind.brief
         elif kind is self.dictofnothing:
-            r = 'dict (no owner)'
+            return 'dict (no owner)'
         else:
-            r = 'dict of ' + \
-                self.ownerclassifier.get_tabrendering(kind.arg, ctx)
-        return r
+            return 'dict of ' + self.ownerclassifier.get_tabrendering(
+                kind.arg, ctx
+            )
 
     def get_userkind(self, k):
         if k is None:
@@ -662,10 +650,7 @@ The classification is performed as follows:
 
     def get_kind(self, xxx_todo_changeme):
         (ka, kd) = xxx_todo_changeme
-        if kd is self.d.notdicttag:
-            return self.a.get_kind(ka)
-        else:
-            return self.d.get_kind(kd)
+        return self.a.get_kind(ka) if kd is self.d.notdicttag else self.d.get_kind(kd)
 
     def get_kindarg(self, kind):
         if kind.fam is self.d.family:
@@ -682,10 +667,7 @@ The classification is performed as follows:
     def get_userkind(self, kind=None, dictof=None):
         try:
             if kind is None and dictof is not None:
-                if dictof == ():
-                    do = self.mod.UniSet.Nothing
-                else:
-                    do = self.sup.get_userkind(dictof)
+                do = self.mod.UniSet.Nothing if dictof == () else self.sup.get_userkind(dictof)
                 return self.d.get_userkind(do)
             elif kind is not None and dictof is None:
                 kind = self.mod.tc_adapt(kind)
@@ -703,14 +685,15 @@ Argument should be either
     dictof=()""")
 
     def get_userkindargrepr(self, kind):
-        if kind.fam is self.d.family:
-            if kind.arg is self.mod.UniSet.Nothing:
-                d = '()'
-            else:
-                d = self.d.ownerclassifier.get_userkindargrepr(kind.arg)
-            return 'dictof=%s' % d
-        else:
+        if kind.fam is not self.d.family:
             return kind.fam.classifier.get_userkindargrepr(kind)
+        d = (
+            '()'
+            if kind.arg is self.mod.UniSet.Nothing
+            else self.d.ownerclassifier.get_userkindargrepr(kind.arg)
+        )
+
+        return f'dictof={d}'
 
     def owners(self, X):
         return self.d.owners(X)
@@ -724,13 +707,11 @@ class RetClaSetFamily:
     def c_alt(self, a, alt):
         return a.arg.classifier.er.refdby.classifier.get_alt(a, alt)
 
-        return self.classifier.get_alt(a, alt)
-
     def _get_arg_brief(self, a):
         return a.arg.er.refdby.classifier.get_tabrendering(a, False)
 
     def c_get_brief(self, a):
-        return '<referred by: %s>' % self._get_arg_brief(a)
+        return f'<referred by: {self._get_arg_brief(a)}>'
 
     def c_get_brief_alt(self, a, alt):
         x = {
@@ -739,7 +720,7 @@ class RetClaSetFamily:
             '>=': 'by at least',
             '>': 'by more than',
         }[alt]
-        return '<referred %s: %s>' % (x, self._get_arg_brief(a))
+        return f'<referred {x}: {self._get_arg_brief(a)}>'
 
     def c_get_ckc(self, a):
         return self.classifier, a.arg.clikinds, '=='
@@ -780,9 +761,7 @@ class ByRetClaSet(Classifier):
             ks = ()
         else:
             ks = (k,)
-        rks = []
-        for k in ks:
-            rks.append(self.referrer_classifier.get_kindarg(k))
+        rks = [self.referrer_classifier.get_kindarg(k) for k in ks]
         return self.mod.ImpSet.immnodeset(rks)
 
     def get_kind(self, k):
@@ -792,7 +771,7 @@ class ByRetClaSet(Classifier):
             return self.mod.refdbynothing
 
     def get_tabheader(self, ctx=''):
-        th = 'Referrers by %s' % self.referrer_classifier.get_tabheader(ctx)
+        th = f'Referrers by {self.referrer_classifier.get_tabheader(ctx)}'
         if ctx:
             th = '{%s}' % th
         return th
@@ -813,7 +792,7 @@ class ByRetClaSet(Classifier):
         clikinds = []
         for arg in args:
             if isinstance(arg, SoKind):
-                if not arg.classifier is self.referrer_classifier:
+                if arg.classifier is not self.referrer_classifier:
                     raise ValueError('Expected a SoKind with the %r classifier, argument had %r.' % (
                         self.referrer_classifier.name,
                         arg.classifier.name))
@@ -865,11 +844,10 @@ class InRelFamily:
         return self.classifier.get_alt(a, alt)
 
     def c_get_brief(self, a):
-        return '<via %s>' % self.classifier.get_tabrendering(a, None)
+        return f'<via {self.classifier.get_tabrendering(a, None)}>'
 
     def c_repr(self, a):
-        return '%s(%s)' % (self.classifier.get_reprname(),
-                           self.classifier.get_userkindargrepr(a))
+        return f'{self.classifier.get_reprname()}({self.classifier.get_userkindargrepr(a)})'
 
 
 class ByInRel(Classifier):
@@ -955,11 +933,10 @@ class ByInRel(Classifier):
     def get_tabheader(self, ctx=''):
         if not ctx:
             return "Referred Via:"
-        else:
-            r = 'Referred Via'
-            if ctx == 'and':
-                r = '{%s}' % r
-            return r
+        r = 'Referred Via'
+        if ctx == 'and':
+            r = '{%s}' % r
+        return r
 
     def get_tabrendering(self, kind, ctx=''):
         r = self.get_userkindargrepr(kind)
@@ -979,31 +956,29 @@ class ByInRel(Classifier):
 class AndClassifier(Classifier):
     def __init__(self, mod, name, args):  # At least 2 args
         if name is None:
-            name = '(%s)' % ' & '.join([x.name for x in args])
+            name = f"({' & '.join([x.name for x in args])})"
         Classifier.__init__(self, mod, name, cli=None,
                             supers=args, depends=args)
         self.args = args
 
     def get_byname(self):
-        return '<%s>' % ' & '.join([x.get_byname() for x in self.args])
+        return f"<{' & '.join([x.get_byname() for x in self.args])}>"
 
     def get_cli(self):
         memo = {}
-        return self.mod.hv.cli_and(tuple([x.cli for x in self.args]), memo)
+        return self.mod.hv.cli_and(tuple(x.cli for x in self.args), memo)
 
     def get_kind(self, k):
-        ks = []
-        for ki, ci in zip(k, self.args):
-            ks.append(ci.get_kind(ki))
+        ks = [ci.get_kind(ki) for ki, ci in zip(k, self.args)]
         return self.mod.UniSet.fam_And._cons(ks)
 
     def get_reprname(self):
-        return '(%s)' % ' & '.join([x.get_reprname() for x in self.args])
+        return f"({' & '.join([x.get_reprname() for x in self.args])})"
 
     def get_tabheader(self, ctx=''):
-        r = '%s' % ' & '.join([x.get_tabheader('and') for x in self.args])
+        r = f"{' & '.join([x.get_tabheader('and') for x in self.args])}"
         if ctx == 'and':
-            r = '(%s)' % r
+            r = f'({r})'
         return r
 
     def get_tabrendering(self, cla, ctx=''):
@@ -1013,7 +988,7 @@ class AndClassifier(Classifier):
             ss.append(s)
         r = ' & '.join(ss)
         if ctx == 'and':
-            r = '(%s)' % r
+            r = f'({r})'
         return r
 
 
@@ -1033,8 +1008,7 @@ class ModuleFamily:
         return self.mod.summary_str(type(a.arg))(a.arg)
 
     def c_repr(self, a):
-        return '%s(%s)' % (self.classifier.get_reprname(),
-                           self.classifier.get_userkindargrepr(a))
+        return f'{self.classifier.get_reprname()}({self.classifier.get_userkindargrepr(a)})'
 
 
 class ByModule(Classifier):
@@ -1058,17 +1032,13 @@ class ByModule(Classifier):
         return 'module'
 
     def get_kind(self, k):
-        if k is None:
-            return self.not_module
-        else:
-            return self.family(k)
+        return self.not_module if k is None else self.family(k)
 
     def get_kindarg(self, kind):
         if kind is self.not_module:
             return None
-        else:
-            assert kind.fam is self.family
-            return kind.arg
+        assert kind.fam is self.family
+        return kind.arg
 
     def get_tabheader(self, ctx=''):
         return 'Module'
@@ -1095,13 +1065,12 @@ class ByModule(Classifier):
     def get_userkindargrepr(self, kind):
         if kind is self.not_module:
             return ''
-        else:
-            m = kind.arg
-            name = m.__name__
-            s = '%r' % name
-            if self.mod._root.sys.modules.get(name) is not m:
-                s += ', at=%s' % hex(id(m))
-            return s
+        m = kind.arg
+        name = m.__name__
+        s = '%r' % name
+        if self.mod._root.sys.modules.get(name) is not m:
+            s += f', at={hex(id(m))}'
+        return s
 
 
 class AltFamily:
@@ -1134,10 +1103,11 @@ class FindexFamily:
         self.range = mod.fam_Family(self)
 
     def c_get_brief(self, a):
-        if not 0 <= a.arg < len(self.classifier.kinds):
-            return '<None>'
-        else:
-            return '%s / %d' % (self.classifier.kinds[a.arg].brief, a.arg)
+        return (
+            '%s / %d' % (self.classifier.kinds[a.arg].brief, a.arg)
+            if 0 <= a.arg < len(self.classifier.kinds)
+            else '<None>'
+        )
 
     def c_repr(self, a):
         return '%s(%d)' % (self.classifier.get_reprname(), a.arg)
@@ -1152,13 +1122,12 @@ class ByFindex(Classifier):
         self.family = mod.fam_mixin_argatom(FindexFamily, self)
 
     def get_cli(self):
-        alts = tuple([(cla.cli, k, cmp) for (cla, k, cmp) in self.alts])
+        alts = tuple((cla.cli, k, cmp) for (cla, k, cmp) in self.alts)
         memo = {}
-        cli = self.mod.hv.cli_findex(alts, memo)
-        return cli
+        return self.mod.hv.cli_findex(alts, memo)
 
     def get_byname(self):
-        return 'index of first matching kind of %s' % (self.kinds,)
+        return f'index of first matching kind of {self.kinds}'
 
     def get_tabheader(self, ctx=''):
         return 'First Matching Kind / Index'
@@ -1174,14 +1143,10 @@ class ProdFamily:
         return self.classifier.get_alt(a, alt)
 
     def c_get_brief(self, a):
-        if a.arg is None:
-            return 'unknown'
-        else:
-            return '%s:%d' % a.arg
+        return 'unknown' if a.arg is None else '%s:%d' % a.arg
 
     def c_repr(self, a):
-        return '%s(%s)' % (self.classifier.get_reprname(),
-                           self.classifier.get_userkindargrepr(a))
+        return f'{self.classifier.get_reprname()}({self.classifier.get_userkindargrepr(a)})'
 
 
 class ByProd(Classifier):
@@ -1203,17 +1168,18 @@ class ByProd(Classifier):
     def get_userkind(self, *args, **kwds):
         if args and kwds:
             raise TypeError(
-                '{}() takes either positional or keyword arguments'.format(
-                    self.get_reprname()))
+                f'{self.get_reprname()}() takes either positional or keyword arguments'
+            )
+
         if kwds:
             if set(kwds.keys()) != {'filename', 'lineno'}:
                 raise TypeError(
-                    '{}() keyword arguments must be '
-                    '"filename" and "lineno"'.format(
-                        self.get_reprname()))
+                    f'{self.get_reprname()}() keyword arguments must be "filename" and "lineno"'
+                )
+
             return self.family((kwds['filename'], kwds['lineno']))
 
-        if len(args) == 0:
+        if not args:
             return self.family(None)
         elif len(args) == 1:
             arg, = args
@@ -1232,24 +1198,17 @@ class ByProd(Classifier):
         elif len(args) == 2:
             filename, lineno = args
             if filename is not None and not isinstance(filename, str):
-                raise TypeError(
-                    '{}() argument 1 must be string or None'.format(
-                        self.get_reprname()))
+                raise TypeError(f'{self.get_reprname()}() argument 1 must be string or None')
             if lineno is not None and not isinstance(lineno, int):
-                raise TypeError(
-                    '{}() argument 2 must be integer or None'.format(
-                        self.get_reprname()))
+                raise TypeError(f'{self.get_reprname()}() argument 2 must be integer or None')
             return self.family((filename, lineno))
         else:
             raise TypeError(
-                '{}() takes from 0 to 2 positional arguments '
-                'but {} were given'.format(
-                    self.get_reprname(), len(args)))
+                f'{self.get_reprname()}() takes from 0 to 2 positional arguments but {len(args)} were given'
+            )
 
     def get_userkindargrepr(self, kind):
-        if kind.arg is None:
-            return ''
-        return '%r, %r' % kind.arg
+        return '' if kind.arg is None else '%r, %r' % kind.arg
 
 
 class _GLUECLAMP_:
@@ -1302,7 +1261,7 @@ class _GLUECLAMP_:
 
     def mker_dictof(self, er, name=None):
         if name is None:
-            name = '%s.dictof' % er.classifier.name
+            name = f'{er.classifier.name}.dictof'
         return self.mker_memoized(
             name,
             lambda:
@@ -1319,7 +1278,7 @@ class _GLUECLAMP_:
 
     def mker_refdby(self, er, name=None):
         if name is None:
-            name = '%s.refdby' % er.classifier.name
+            name = f'{er.classifier.name}.refdby'
         return self.mker_memoized(
             name,
             lambda:
@@ -1386,12 +1345,12 @@ the object.
             if t not in ('type', 'class'):
                 raise ValueError(err)
             try:
-                ty = getattr(self.types, t.capitalize()+'Type')
+                ty = getattr(self.types, f'{t.capitalize()}Type')
             except AttributeError:
                 ty = getattr(self.builtins, t.lower())
             if not isinstance(kind, ty):
-                raise TypeError('%s object expected' % t)
-            if not s[2] == 'at':
+                raise TypeError(f'{t} object expected')
+            if s[2] != 'at':
                 raise ValueError(err)
             names = s[1].split('.')
             if len(names) < 2:
@@ -1419,7 +1378,7 @@ the object.
             t = 'type'
         else:
             raise TypeError('type expected')
-        return '<%s %s.%s at %s>' % (t, k.__module__, k.__name__, hex(id(k)))
+        return f'<{t} {k.__module__}.{k.__name__} at {hex(id(k))}>'
 
     # Convenience interfaces
 
@@ -1447,21 +1406,18 @@ the object.
         return self.dictof(self.Use.Nothing)
 
     def _get_invtypemod(self):
-        invtypemod = {}
-        for k, v in list(self.types._module.__dict__.items()):
-            if k.endswith('Type'):
-                invtypemod[v] = k[:-4]
-        return invtypemod
+        return {
+            v: k[:-4]
+            for k, v in list(self.types._module.__dict__.items())
+            if k.endswith('Type')
+        }
 
     def _get_notdict(self):
         return ~self.Use.Type.Dict
 
     def findex(self, *kinds):
         return self._er_by_(
-            ByFindex,
-            self,
-            'findex(%s)' % ', '.join([repr(k) for k in kinds]),
-            kinds
+            ByFindex, self, f"findex({', '.join([repr(k) for k in kinds])})", kinds
         )
 
     def _get_refdbynothing(self):
@@ -1478,10 +1434,9 @@ the object.
             ckc = kind.get_ckc()
             if cla is None:
                 cla = ckc[0]
-            else:
-                if ckc[0] is not cla:
-                    raise ValueError(
-                        'Kind at index %d has wrong classifier.' % len(clikinds))
+            elif ckc[0] is not cla:
+                raise ValueError(
+                    'Kind at index %d has wrong classifier.' % len(clikinds))
             if ckc[-1] != '==':
                 raise ValueError(
                     'Kind at index %d has wrong comparision.' % len(clikinds))

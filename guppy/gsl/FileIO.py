@@ -25,17 +25,14 @@ class TestIO:
         self.tempno = 0
 
     def access(self, name, mode):
-        if name in self.files:
-            return True
-        return False
+        return name in self.files
 
     def listdir(self, name):
         li = []
         name = self.path.join(name, '')
         for k in self.files:
             if k.startswith(name):
-                rest = k[len(name):]
-                if rest:
+                if rest := k[len(name) :]:
                     li.append(rest)
         return li
 

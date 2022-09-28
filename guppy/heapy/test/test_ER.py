@@ -270,16 +270,16 @@ class FirstCase(TestCase):
             self.aseq(s & sk, s, -1)
             self.aseq(s & ske, s, -1)
 
-        # That it can do .refdby
-
-        er_refdby = er.refdby
-
-        # That it can do .dictof
-
-        er_dictof = er.dictof
-
         if level > 0:
+            # That it can do .refdby
+
+            er_refdby = er.refdby
+
             self.er_test(er_refdby, set, level - 1)
+            # That it can do .dictof
+
+            er_dictof = er.dictof
+
             self.er_test(er_dictof, set, level - 1)
 
     def test_7(self):
